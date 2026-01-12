@@ -982,6 +982,11 @@ const sbsWrapper = q("sbsWrapper");
 const sbsLeftImg = q("sbsLeftImg");
 const sbsRightImg = q("sbsRightImg");
 
+// ✅ Zorg dat slider + SxS exact dezelfde transform-pipeline gebruiken
+[beforeImgTag, afterImgTag, sbsLeftImg, sbsRightImg].forEach(img => {
+  if(img) img.classList.add("cal-img");
+});
+
 if (sbsWrapper) sbsWrapper.style.display = "none";
 
 
