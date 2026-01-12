@@ -442,11 +442,10 @@ function requestBrowserFullscreen(){
     gate.dataset.mode = "";
   };
 
-  // ✅ Default: alleen tonen als je NIET fullscreen bent
-  if(!isBrowserFullscreen()){
-    // als je hem niet meer standaard wil bij load: comment deze regel uit
-    openGate();
-  } else {
+ // ✅ niet automatisch openen bij load
+closeGate();
+  
+  else {
     closeGate();
   }
 
@@ -676,7 +675,62 @@ function beginFsEnterMask(){
 function endFsEnterMask(){
   comparisonWrapper.classList.remove("fs-entering");
 }
+function updateFullscreenBars(){
+  if(!comparisonWrapper) return;
 
+  // In SBS: we willen geen letterbox-usable window (elk pane is eigen rect)
+  if(sbsActive){
+    comparisonWrapper._usableW = comparisonWrapper.getBoundingClientRect().width;
+    comparisonWrapper._usableH = comparisonWrapper.getBoundingClientRect().height;
+
+    comparisonWrapper._lbLeft = comparisonWrapper._lbRight = 0;
+    comparisonWrapper._lbTop  = comparisonWrapper._lbBottom = 0;
+
+    ["--lb-top","--lb-bottom","--lb-left","--lb-right"].forEach(v =>
+      comparisonWrapper.style.setProperty(v,"0px")
+    );
+    return;
+  }
+
+  const rect = comparisonWrapper.getBoundingClientRect();
+  const W = Math.max(1, rect.width);
+  const H = Math.max(1, rect.height);
+
+  const targetAR = getTargetAR();     // w/h
+  const hostAR   = W / H;
+
+  let usableW = W, usableH = H;
+  let lbL=0, lbR=0, lbT=0, lbB=0;
+
+  // contain: maak een "usable window" die targetAR past binnen wrapper
+  if(hostAR > targetAR){
+    // pillarbox (te breed)
+    usableH = H;
+    usableW = Math.round(usableH * targetAR);
+    lbL = Math.round((W - usableW) / 2);
+    lbR = W - usableW - lbL;
+  } else {
+    // letterbox (te hoog)
+    usableW = W;
+    usableH = Math.round(usableW / targetAR);
+    lbT = Math.round((H - usableH) / 2);
+    lbB = H - usableH - lbT;
+  }
+
+  comparisonWrapper._usableW = usableW;
+  comparisonWrapper._usableH = usableH;
+
+  comparisonWrapper._lbLeft   = lbL;
+  comparisonWrapper._lbRight  = lbR;
+  comparisonWrapper._lbTop    = lbT;
+  comparisonWrapper._lbBottom = lbB;
+
+  // CSS vars (als je CSS daarop leunt)
+  comparisonWrapper.style.setProperty("--lb-left",   lbL + "px");
+  comparisonWrapper.style.setProperty("--lb-right",  lbR + "px");
+  comparisonWrapper.style.setProperty("--lb-top",    lbT + "px");
+  comparisonWrapper.style.setProperty("--lb-bottom", lbB + "px");
+}
 function scheduleLayoutStabilize(){
   // 2x RAF: wacht tot fullscreen layout echt staat
   requestAnimationFrame(() => {
