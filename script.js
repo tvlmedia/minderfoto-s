@@ -1004,9 +1004,10 @@ if (sbsWrapper) sbsWrapper.style.display = "none";
 
 
 function getCalBoxFor(img){
-  // In SBS is elke pane een eigen “viewport”
+  // ✅ SBS: meet de viewport/pane, NIET de image (want die heeft transforms)
   if(sbsActive && img){
-    const r = img.getBoundingClientRect();
+    const pane = img.closest?.(".sbsPane") || img.parentElement; // pas class aan als jij anders heet
+    const r = (pane?.getBoundingClientRect?.() || comparisonWrapper.getBoundingClientRect());
     return { w: Math.max(1, r.width), h: Math.max(1, r.height) };
   }
 
