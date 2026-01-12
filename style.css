@@ -949,10 +949,17 @@ body.sbs-mode .controlsStack.desktop-only{
   display: none !important;
   height: 0 !important;
 }
-/* ✅ CALIBRATION TRANSFORM – geldt voor slider én SxS */
-.cal-img{
+/* ✅ SINGLE SOURCE OF TRUTH: slider + SxS gebruiken exact dezelfde transform */
+#comparisonWrapper .cal-img{
+  --cal-tx: 0px;
+  --cal-ty: 0px;
+  --cal-scale: 1;
+
+  transform:
+    scale(calc(var(--sensor-scale, 1) * var(--viewer-scale, 1)))
+    translate3d(var(--cal-tx, 0px), var(--cal-ty, 0px), 0)
+    scale(var(--cal-scale, 1)) !important;
+
   transform-origin: center center !important;
-  transform: translate3d(var(--cal-tx, 0px), var(--cal-ty, 0px), 0)
-             scale(calc(var(--viewer-scale, 1) * var(--cal-scale, 1))) !important;
   will-change: transform;
 }
