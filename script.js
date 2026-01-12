@@ -1925,6 +1925,106 @@ function showDetailBoxAt(
 
   return true;
 }
+
+function objectPositionOffset(posStr, leftoverX, leftoverY){
+  const parts = String(posStr || "50% 50%").trim().split(/\s+/);
+  const xRaw = parts[0] || "50%";
+  const yRaw = parts[1] || "50%";
+
+  const parse = (v) => {
+    v = String(v || "").toLowerCase();
+    if(v === "left" || v === "top") return 0;
+    if(v === "right" || v === "bottom") return 1;
+    if(v === "center") return 0.5;
+
+    if(v.endsWith("%")){
+      const p = parseFloat(v);
+      return Number.isFinite(p) ? (p / 100) : 0.5;
+    }
+    if(v.endsWith("px")){
+      const px = parseFloat(v);
+      return { px: Number.isFinite(px) ? px : 0 };
+    }
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : 0.5;
+  };
+
+  const toOffset = (val, leftover) => {
+    if(typeof val === "number") return leftover * val;
+    if(val && typeof val === "object" && typeof val.px === "number"){
+      // px object-position: clamp grofweg binnen leftovers (werkt ook bij negatieve leftover)
+      const min = Math.min(0, leftover);
+      const max = Math.max(0, leftover);
+      return Math.max(min, Math.min(max, val.px));
+    }
+    return leftover * 0.5;
+  };
+
+  const pxX = parse(xRaw);
+  const pxY = parse(yRaw);
+
+  return {
+    ox: toOffset(pxX, leftoverX),
+    oy: toOffset(pxY, leftoverY)
+  };
+}
+
+// ✅ fitted rect berekenen in een GEVEN box (usableRect), i.p.v. op de getransformeerde <img> rect
+function getFittedImageRectInBox(imgEl, boxRect){
+  const iw = imgEl?.naturalWidth  || 0;
+  const ih = imgEl?.naturalHeight || 0;
+
+  const base = {
+    left: boxRect.left,
+    top: boxRect.top,
+    width: boxRect.width,
+    height: boxRect.height
+  };
+
+  if(!iw || !ih){
+    return {
+      ...base,
+      right: base.left + base.width,
+      bottom: base.top + base.height
+    };
+  }
+
+  const cs = getComputedStyle(imgEl);
+  const fit = cs.objectFit || "fill";
+
+  if(fit !== "contain" && fit !== "cover"){
+    return {
+      ...base,
+      right: base.left + base.width,
+      bottom: base.top + base.height
+    };
+  }
+
+  const scale = (fit === "contain")
+    ? Math.min(base.width / iw, base.height / ih)
+    : Math.max(base.width / iw, base.height / ih);
+
+  const drawW = iw * scale;
+  const drawH = ih * scale;
+
+  const leftoverX = base.width  - drawW;
+  const leftoverY = base.height - drawH;
+
+  const { ox, oy } = objectPositionOffset(cs.objectPosition, leftoverX, leftoverY);
+
+  const left = base.left + ox;
+  const top  = base.top  + oy;
+
+  return {
+    left,
+    top,
+    width:  drawW,
+    height: drawH,
+    right:  left + drawW,
+    bottom: top  + drawH
+  };
+}
+
 function getFittedImageRect(imgEl){
   const r = imgEl.getBoundingClientRect();
 
@@ -2131,8 +2231,16 @@ showDetailBoxAt(
   }
 
  // 2) rx/ry PER IMAGE ...
-const rectL = getFittedImageRect(afterImgTag);
-const rectR = getFittedImageRect(beforeImgTag);
+// ✅ baseer mapping op de "usable window" (dus wat jij echt ziet), niet op de getransformeerde <img>-rect
+const usableBox = {
+  left: usableRect.left,
+  top: usableRect.top,
+  width: uW,
+  height: uH
+};
+
+const rectL = getFittedImageRectInBox(afterImgTag,  usableBox);
+const rectR = getFittedImageRectInBox(beforeImgTag, usableBox);
 
 const rxL = (e.clientX - rectL.left) / rectL.width;
 const ryL = (e.clientY - rectL.top)  / rectL.height;
