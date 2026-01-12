@@ -987,12 +987,12 @@ exposureBtn?.addEventListener("click", () => {
 
 /* Flare: 3 standen */
 flareToggle.dataset.mode = flareToggle.dataset.mode || "noflare";
-const flareLabel = (m)=> m==="noflare" ? "Flare: OFF" : (m==="flare" ? "Flare: ON" : "Double Flare: ON");
+const flareLabel = (m)=> m==="noflare" ? "Flare: OFF" : (m==="flare" ? "Flare: ON" : "Dual Flare: ON");
 flareToggle.textContent = flareLabel(flareToggle.dataset.mode);
 
 flareToggle.addEventListener("click", ()=>{
   const cur = flareToggle.dataset.mode;
-  const next = (cur==="noflare") ? "flare" : (cur==="flare" ? "doubleflare" : "noflare");
+  const next = (cur==="noflare") ? "flare" : (cur==="flare" ? "dualflare" : "noflare");
   flareToggle.dataset.mode = next;
   flareToggle.textContent = flareLabel(next);
   updateImages();
@@ -1432,7 +1432,7 @@ function resolveImageCandidates(lens, nominalFocal, tStr, flareMode, sceneMode, 
 
     // 3) portrait/normal
     push(`${b}_${flareMode}.jpg`);
-    if(flareMode === "doubleflare") push(`${b}_flare.jpg`);
+    if(flareMode === "dualflare") push(`${b}_flare.jpg`);
     push(`${b}_noflare.jpg`);
     push(`${b}.jpg`);
   });
