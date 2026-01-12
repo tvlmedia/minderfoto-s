@@ -442,24 +442,20 @@ function requestBrowserFullscreen(){
     gate.dataset.mode = "";
   };
 
- // ✅ niet automatisch openen bij load
-closeGate();
-  
-  else {
-    closeGate();
-  }
+  // ✅ niet automatisch openen bij load
+  closeGate();
 
   btn.onclick = () => {
-  // return-gate mode: jouw code gebruikt die elders
-  if(gate.dataset.mode === "return") return; // showFsReturnGate zet dan z’n eigen onclick
+    // return-gate mode: jouw code gebruikt die elders
+    if(gate.dataset.mode === "return") return;
 
-  try{
-    requestBrowserFullscreen();
-    closeGate();
-  } catch(e){
-    console.warn("Fullscreen request blocked:", e);
-  }
-};
+    try{
+      requestBrowserFullscreen();
+      closeGate();
+    } catch(e){
+      console.warn("Fullscreen request blocked:", e);
+    }
+  };
 
   document.addEventListener("fullscreenchange", () => {
     if(isBrowserFullscreen()) closeGate();
