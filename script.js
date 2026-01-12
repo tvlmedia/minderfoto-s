@@ -1675,8 +1675,15 @@ function setSideBySide(on,{force=false}={}) {
     resetSplitToMiddle();
   }
 
-  applyCalibrationTransforms();
-  updateToggleHighlights();
+  // ✅ Layout moet eerst “settlen” (flex panes + imgs)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      updateFullscreenBars();
+      resetSplitToMiddle();      // no-op in sbs, maar safe
+      applyCalibrationTransforms();
+      updateToggleHighlights();
+    });
+  });
 }
 
 sbsBtn?.addEventListener("click",()=>setSideBySide(!sbsActive));
@@ -1707,11 +1714,11 @@ function recalcLayout(){
   else applyCalibrationTransforms();
 }
 
-// 1x listeners, klaar
-beforeImgTag.addEventListener("load", recalcLayout);
-afterImgTag.addEventListener("load", recalcLayout);
-beforeImgTag.addEventListener("error", recalcLayout);
-afterImgTag.addEventListener("error", recalcLayout);
+// ✅ SBS images moeten óók layout/calibratie retriggeren
+sbsLeftImg?.addEventListener("load", recalcLayout);
+sbsRightImg?.addEventListener("load", recalcLayout);
+sbsLeftImg?.addEventListener("error", recalcLayout);
+sbsRightImg?.addEventListener("error", recalcLayout);
 
 // eerste keer na init/updateImages
 recalcLayout();
