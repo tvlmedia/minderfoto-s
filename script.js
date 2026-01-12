@@ -203,7 +203,7 @@ const cameras = {
 };
 
 /* === Lens lijsten, alias-focals, files en teksten === */
-const lenses = ["IronGlass Red P","IronGlass Sovjet MKII","IronGlass Zeiss Jena","IronGlass Sovjet Medium Format"];
+const lenses = ["IronGlass Red P","IronGlass Sovjet MKII","IronGlass Zeiss Jena","IronGlass Titan Zoom","IronGlass Sovjet Medium Format"];
 
 /* === UI focal -> file focal overrides (alleen échte uitzonderingen) === */
 const notes = {
@@ -217,12 +217,21 @@ const notes = {
   // Als je UI nog 85mm aanbiedt voor Jena/MF maar je wil hem altijd naar 80mm sturen:
   // (mag blijven, maar als je nearest-focal gebruikt kan dit er uiteindelijk uit)
   "ironglass_zeiss_jena_85mm": "80mm",
+  "ironglass_titan_zoom_35mm": "37mm",
+  "ironglass_titan_zoom_28mm": "29mm",
   "ironglass_sovjet_medium_format_28mm": "30mm"
 };
 
 /* === Measured / available real T-stops per lensSlug + FILE focal === */
 const MEASURED_TSTOPS = {
-
+  "ironglass_titan_zoom": {
+    // jij hebt o.a. 50mm t2_9 / t4, en eerder had je ook 120/85 etc.
+    "120mm": ["4", "2.9"],
+    "85mm":  ["4", "2.9"],
+    "50mm":  ["4", "2.9"],
+    "37mm":  ["4", "2.9"],
+    "29mm":  ["4", "2.8"]
+  },
 
   "ironglass_sovjet_medium_format": {
     // jouw nieuwe files: 45mm t3_9/t4 en 65mm t3_8/t4 (en eventueel andere later)
@@ -290,6 +299,14 @@ const TSTOP_FILE_ALIAS = {
     "2":  "1.9",
     "2.8":"2.8",
     "4":  "4"
+  },
+
+  "ironglass_titan_zoom": {
+    // files: t2_9, t4
+    
+    "2":  "2.9",
+    "2.8":"2.9",
+    "4":  "4"
   }
 
   // ❗ Sovjet Medium Format bewust NIET hard aliasen naar 2.9,
@@ -302,6 +319,7 @@ const lensDescriptions = {
   "IronGlass Red P": { text:"Extremely vintage Soviet optics with single coating, heavy character, flare and distortion. Pure, raw, unpolished glass for maximum personality.", url:"https://ironglassadapters.com/rehousing/red-p-limited-edition-soviet-lens-rehousing/" },
   "IronGlass Zeiss Jena": { text:"Soft vintage signature without heavy distortion or wild flares. Adds character while keeping faces natural and flattering.", url:"https://ironglassadapters.com/rehousing/carl-zeiss-jena-rehousing/" },
   "IronGlass Sovjet MKII": { text:"The IronGlass MKII Soviet set is, after the RED P, the most intense variant: heavily-tweaked vintage Soviet lenses with extreme character, flare and distortion. Ideal for a raw, experimental look.", url:"https://ironglassadapters.com/rehoused-soviet-lenses/mkii/" },
+  "IronGlass Titan Zoom": { text:"The IronGlass Titan Zoom is a cleaner zoom lens, which covers big sensors", url:"https://ironglassadapters.com/id/23/" },
   "IronGlass Sovjet Medium Format": { text:"The IronGlass Sovjet Medium Format is a 8 lens set, which covers medium format sensors like GFX Eterna, Blackmagic Ursa 17K & Arri Alexa 265", url:"https://ironglassadapters.com/id/23/" },
  };
 
@@ -388,7 +406,27 @@ if (advancedToggle && advancedPanel) {
     advancedToggle.blur();
   });
 }
+// ✅ HARD FIX: forceer dat ALLE viewer-images altijd de calibratie-vars gebruiken
+(function forceCalibratedTransform(){
+  const id = "tvl-cal-transform-fix";
+  if (document.getElementById(id)) return;
 
+  const st = document.createElement("style");
+  st.id = id;
+  st.textContent = `
+  #beforeImgTag, #afterImgTag, #sbsLeftImg, #sbsRightImg {
+    transform:
+      scale(var(--sensor-scale, 1))
+      scale(var(--viewer-scale, 1))
+      translate3d(var(--cal-tx, 0px), var(--cal-ty, 0px), 0)
+      scale(var(--cal-scale, 1)) !important;
+
+    transform-origin: center center !important;
+    will-change: transform;
+  }
+`;
+  document.head.appendChild(st);
+})();
 // ✅ Guard: als pulseFsBars niet bestaat → no-op
 const pulseFsBarsSafe = (opts) => {
   if (typeof window.pulseFsBars === "function") window.pulseFsBars(opts);
@@ -982,21 +1020,17 @@ const sbsWrapper = q("sbsWrapper");
 const sbsLeftImg = q("sbsLeftImg");
 const sbsRightImg = q("sbsRightImg");
 
-// ✅ Zorg dat slider + SxS exact dezelfde transform-pipeline gebruiken
-[beforeImgTag, afterImgTag, sbsLeftImg, sbsRightImg].forEach(img => {
-  if(img) img.classList.add("cal-img");
-});
-
 if (sbsWrapper) sbsWrapper.style.display = "none";
 
 
 function getCalBoxFor(img){
+  // In SBS is elke pane een eigen “viewport”
   if(sbsActive && img){
-    const pane = img.closest?.(".pane") || img.parentElement;
-    const r = (pane?.getBoundingClientRect?.() || comparisonWrapper.getBoundingClientRect());
+    const r = img.getBoundingClientRect();
     return { w: Math.max(1, r.width), h: Math.max(1, r.height) };
   }
 
+  // Slider-mode: gebruik “usable window” (excl. letter/pillarbox)
   const rect = comparisonWrapper.getBoundingClientRect();
   const lbL = comparisonWrapper._lbLeft || 0;
   const lbR = comparisonWrapper._lbRight || 0;
@@ -1008,6 +1042,7 @@ function getCalBoxFor(img){
     h: Math.max(1, (comparisonWrapper._usableH ?? (rect.height - lbT - lbB)))
   };
 }
+
 function calScaleFor(img){
   const fit = (img ? getComputedStyle(img).objectFit : "cover") || "cover";
   const { w, h } = getCalBoxFor(img);
@@ -1043,7 +1078,13 @@ const CAL_Y_INVERT = true; // zet op false als Y de verkeerde kant op gaat
 // per lensSlug + focal: { scale, x, y }  (x/y = Resolve Position waarden)
 // per lensSlug + focal: { scale, x, y }  (x/y = Resolve Position waarden)
 const CALIBRATION = {
-  
+  "ironglass_titan_zoom": {
+    "120mm": { scale: 0.96, x: 25.823, y: -70.244 },
+    "85mm":  { scale: 0.89, x: 3.000,  y: 35.000 },
+    "50mm":  { scale: 0.96, x: -3.965,  y: -27.412 },
+    "35mm":  { scale: 0.900, x: -13.930,  y: -77.447 },
+    "28mm":  { scale: 0.925, x: 2.000,  y: -37.000 }
+  },
 
   "ironglass_sovjet_medium_format": {
     "120mm": { scale: 0.95, x: 40.668, y: -18.485 },
@@ -1510,9 +1551,9 @@ resetSplitToMiddle();
 
 /* === Init defaults === */
 /* === Init defaults === */
-leftSelect.value  = "IronGlass Sovjet Medium Format";
+leftSelect.value  = "IronGlass Sovjet MKII";
 rightSelect.value = "IronGlass Zeiss Jena";
-focalLengthSelect.value = "50mm";
+focalLengthSelect.value = "35mm";
 tStopLeftSelect.value   = "2.8";
 tStopRightSelect.value  = "2.8";
 
@@ -1680,15 +1721,8 @@ function setSideBySide(on,{force=false}={}) {
     resetSplitToMiddle();
   }
 
-  // ✅ Layout moet eerst “settlen” (flex panes + imgs)
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      updateFullscreenBars();
-      resetSplitToMiddle();      // no-op in sbs, maar safe
-      applyCalibrationTransforms();
-      updateToggleHighlights();
-    });
-  });
+  applyCalibrationTransforms();
+  updateToggleHighlights();
 }
 
 sbsBtn?.addEventListener("click",()=>setSideBySide(!sbsActive));
@@ -1719,18 +1753,11 @@ function recalcLayout(){
   else applyCalibrationTransforms();
 }
 
-// ✅ SBS images moeten óók layout/calibratie retriggeren
-sbsLeftImg?.addEventListener("load", recalcLayout);
-sbsRightImg?.addEventListener("load", recalcLayout);
-sbsLeftImg?.addEventListener("error", recalcLayout);
-sbsRightImg?.addEventListener("error", recalcLayout);
-
-// ✅ Slider images moeten óók layout/calibratie retriggeren
-beforeImgTag?.addEventListener("load", recalcLayout);
-afterImgTag?.addEventListener("load", recalcLayout);
-beforeImgTag?.addEventListener("error", recalcLayout);
-afterImgTag?.addEventListener("error", recalcLayout);
-
+// 1x listeners, klaar
+beforeImgTag.addEventListener("load", recalcLayout);
+afterImgTag.addEventListener("load", recalcLayout);
+beforeImgTag.addEventListener("error", recalcLayout);
+afterImgTag.addEventListener("error", recalcLayout);
 
 // eerste keer na init/updateImages
 recalcLayout();
@@ -2012,6 +2039,41 @@ function getFittedImageRect(imgEl){
   };
 }
 
+function getOuterViewerScale(){
+  const sensor = parseFloat(getComputedStyle(comparisonWrapper).getPropertyValue("--sensor-scale")) || 1;
+  const viewer = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--viewer-scale")) || 1;
+  return sensor * viewer;
+}
+
+// Zet rx/ry (0..1 in de VIEWER) om naar rx/ry (0..1 in de ONGETRANSFORMEERDE image)
+// zodat de detail-zoom exact de gecalibreerde view volgt.
+function uncalibrateRxRy(imgEl, rect, rx, ry){
+  if(!imgEl || !rect) return { rx, ry };
+
+  const cs = getComputedStyle(imgEl);
+
+  const tx = parseFloat(cs.getPropertyValue("--cal-tx")) || 0;
+  const ty = parseFloat(cs.getPropertyValue("--cal-ty")) || 0;
+  const sc = parseFloat(cs.getPropertyValue("--cal-scale")) || 1;
+
+  const outer = getOuterViewerScale();
+
+  // translate wordt in jouw transform nog vermenigvuldigd door outer-scale (maar niet door cal-scale)
+  const dxN = (tx * outer) / Math.max(1, rect.width);
+  const dyN = (ty * outer) / Math.max(1, rect.height);
+
+  // 1) undo translate
+  let u = rx - dxN;
+  let v = ry - dyN;
+
+  // 2) undo cal-scale (scale rond center)
+  const inv = 1 / Math.max(0.0001, sc);
+  u = (u - 0.5) * inv + 0.5;
+  v = (v - 0.5) * inv + 0.5;
+
+  return { rx: u, ry: v };
+}
+
 document.addEventListener("mousemove", (e) => {
   if(!detailActive) return;
 
@@ -2049,16 +2111,19 @@ groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
 groupX = Math.round(groupX);
 groupY = Math.round(groupY);
 
-  showDetailBoxAt(
-  e, leftDetail, leftDetailImg, sbsLeftImg, L, rx, ry,
+const Lp = uncalibrateRxRy(sbsLeftImg,  L, rx, ry);
+const Rp = uncalibrateRxRy(sbsRightImg, R, rx, ry);
+
+showDetailBoxAt(
+  e, leftDetail, leftDetailImg, sbsLeftImg, L, Lp.rx, Lp.ry,
   "left", zoom, size, 0,
   { x: groupX, y: groupY }
 );
 
 showDetailBoxAt(
-  e, rightDetail, rightDetailImg, sbsRightImg, R, rx, ry,
+  e, rightDetail, rightDetailImg, sbsRightImg, R, Rp.rx, Rp.ry,
   "right", zoom, size, 0,
- { x: groupX + size, y: groupY }
+  { x: groupX + size, y: groupY }
 );
   return;
 }
@@ -2088,27 +2153,53 @@ showDetailBoxAt(
     return;
   }
 
-  // 2) rx/ry PER IMAGE op basis van de getransformeerde img rects
-  const rectL = getFittedImageRect(afterImgTag);
+ // 2) rx/ry PER IMAGE ...
+const rectL = getFittedImageRect(afterImgTag);
 const rectR = getFittedImageRect(beforeImgTag);
 
-  const rxL = (e.clientX - rectL.left) / rectL.width;
-  const ryL = (e.clientY - rectL.top)  / rectL.height;
+const rxL = (e.clientX - rectL.left) / rectL.width;
+const ryL = (e.clientY - rectL.top)  / rectL.height;
 
-  const rxR = (e.clientX - rectR.left) / rectR.width;
-  const ryR = (e.clientY - rectR.top)  / rectR.height;
+const rxR = (e.clientX - rectR.left) / rectR.width;
+const ryR = (e.clientY - rectR.top)  / rectR.height;
 
- const cfg = getDetailConfig();
+const cfg = getDetailConfig();
+const size = cfg.size;
+const zoom = cfg.zoom;
+
+const pad = 8;
+const gap = 0; // ✅ geen ruimte tussen de twee boxes
+
+// ✅ 1x clamp voor het hele duo
+const groupW = (size * 2) + gap;
+
+// Als gap=0 wil je meestal dat je cursor ongeveer op de “naad” zit:
+let groupX = e.clientX - size;
+let groupY = e.clientY - (size / 2);
+
+groupX = clamp(groupX, pad, window.innerWidth  - groupW - pad);
+groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
+
+groupX = Math.round(groupX);
+groupY = Math.round(groupY);
+
+const pL = uncalibrateRxRy(afterImgTag,  rectL, rxL, ryL);
+const pR = uncalibrateRxRy(beforeImgTag, rectR, rxR, ryR);
 
 const showL = showDetailBoxAt(
   e, leftDetail, leftDetailImg, afterImgTag,
-  rectL, rxL, ryL, "left", cfg.zoom, cfg.size, 0
+  rectL, pL.rx, pL.ry, "left", zoom, size, 0,
+  { x: groupX, y: groupY }
 );
 
 const showR = showDetailBoxAt(
   e, rightDetail, rightDetailImg, beforeImgTag,
-  rectR, rxR, ryR, "right", cfg.zoom, cfg.size, 0
+  rectR, pR.rx, pR.ry, "right", zoom, size, 0,
+  { x: groupX + size, y: groupY } // ✅ direct naast elkaar
 );
+
+if(!showL) leftDetail.style.display  = "none";
+if(!showR) rightDetail.style.display = "none";
 
  if(!showL) leftDetail.style.display  = "none";
 if(!showR) rightDetail.style.display = "none";
