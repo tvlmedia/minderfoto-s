@@ -1725,6 +1725,13 @@ sbsRightImg?.addEventListener("load", recalcLayout);
 sbsLeftImg?.addEventListener("error", recalcLayout);
 sbsRightImg?.addEventListener("error", recalcLayout);
 
+// ✅ Slider images moeten óók layout/calibratie retriggeren
+beforeImgTag?.addEventListener("load", recalcLayout);
+afterImgTag?.addEventListener("load", recalcLayout);
+beforeImgTag?.addEventListener("error", recalcLayout);
+afterImgTag?.addEventListener("error", recalcLayout);
+
+
 // eerste keer na init/updateImages
 recalcLayout();
 
