@@ -203,7 +203,7 @@ const cameras = {
 };
 
 /* === Lens lijsten, alias-focals, files en teksten === */
-const lenses = ["IronGlass Red P","IronGlass Sovjet MKII","IronGlass Zeiss Jena","IronGlass Titan Zoom","IronGlass Sovjet Medium Format"];
+const lenses = ["IronGlass Red P","IronGlass Sovjet MKII","IronGlass Zeiss Jena","IronGlass Sovjet Medium Format"];
 
 /* === UI focal -> file focal overrides (alleen échte uitzonderingen) === */
 const notes = {
@@ -217,22 +217,12 @@ const notes = {
   // Als je UI nog 85mm aanbiedt voor Jena/MF maar je wil hem altijd naar 80mm sturen:
   // (mag blijven, maar als je nearest-focal gebruikt kan dit er uiteindelijk uit)
   "ironglass_zeiss_jena_85mm": "80mm",
-  "ironglass_titan_zoom_35mm": "37mm",
-  "ironglass_titan_zoom_28mm": "29mm",
   "ironglass_sovjet_medium_format_28mm": "30mm"
 };
 
 /* === Measured / available real T-stops per lensSlug + FILE focal === */
 const MEASURED_TSTOPS = {
-  "ironglass_titan_zoom": {
-    // jij hebt o.a. 50mm t2_9 / t4, en eerder had je ook 120/85 etc.
-    "120mm": ["4", "2.9"],
-    "85mm":  ["4", "2.9"],
-    "50mm":  ["4", "2.9"],
-    "37mm":  ["4", "2.9"],
-    "29mm":  ["4", "2.8"]
-  },
-
+  
   "ironglass_sovjet_medium_format": {
     // jouw nieuwe files: 45mm t3_9/t4 en 65mm t3_8/t4 (en eventueel andere later)
     "120mm": ["4", "2.9"],
@@ -301,13 +291,7 @@ const TSTOP_FILE_ALIAS = {
     "4":  "4"
   },
 
-  "ironglass_titan_zoom": {
-    // files: t2_9, t4
-    
-    "2":  "2.9",
-    "2.8":"2.9",
-    "4":  "4"
-  }
+
 
   // ❗ Sovjet Medium Format bewust NIET hard aliasen naar 2.9,
   // want 45/65 hebben t3_9/t3_8. Laat measured (focal-aware) dit bepalen.
@@ -319,7 +303,6 @@ const lensDescriptions = {
   "IronGlass Red P": { text:"Extremely vintage Soviet optics with single coating, heavy character, flare and distortion. Pure, raw, unpolished glass for maximum personality.", url:"https://ironglassadapters.com/rehousing/red-p-limited-edition-soviet-lens-rehousing/" },
   "IronGlass Zeiss Jena": { text:"Soft vintage signature without heavy distortion or wild flares. Adds character while keeping faces natural and flattering.", url:"https://ironglassadapters.com/rehousing/carl-zeiss-jena-rehousing/" },
   "IronGlass Sovjet MKII": { text:"The IronGlass MKII Soviet set is, after the RED P, the most intense variant: heavily-tweaked vintage Soviet lenses with extreme character, flare and distortion. Ideal for a raw, experimental look.", url:"https://ironglassadapters.com/rehoused-soviet-lenses/mkii/" },
-  "IronGlass Titan Zoom": { text:"The IronGlass Titan Zoom is a cleaner zoom lens, which covers big sensors", url:"https://ironglassadapters.com/id/23/" },
   "IronGlass Sovjet Medium Format": { text:"The IronGlass Sovjet Medium Format is a 8 lens set, which covers medium format sensors like GFX Eterna, Blackmagic Ursa 17K & Arri Alexa 265", url:"https://ironglassadapters.com/id/23/" },
  };
 
@@ -1078,13 +1061,7 @@ const CAL_Y_INVERT = true; // zet op false als Y de verkeerde kant op gaat
 // per lensSlug + focal: { scale, x, y }  (x/y = Resolve Position waarden)
 // per lensSlug + focal: { scale, x, y }  (x/y = Resolve Position waarden)
 const CALIBRATION = {
-  "ironglass_titan_zoom": {
-    "120mm": { scale: 0.96, x: 25.823, y: -70.244 },
-    "85mm":  { scale: 0.89, x: 3.000,  y: 35.000 },
-    "50mm":  { scale: 0.96, x: -3.965,  y: -27.412 },
-    "35mm":  { scale: 0.900, x: -13.930,  y: -77.447 },
-    "28mm":  { scale: 0.925, x: 2.000,  y: -37.000 }
-  },
+  
 
   "ironglass_sovjet_medium_format": {
     "120mm": { scale: 0.95, x: 40.668, y: -18.485 },
