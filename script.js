@@ -2056,16 +2056,19 @@ groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
 groupX = Math.round(groupX);
 groupY = Math.round(groupY);
 
-  showDetailBoxAt(
-  e, leftDetail, leftDetailImg, sbsLeftImg, L, rx, ry,
+const Lp = uncalibrateRxRy(sbsLeftImg,  L, rx, ry);
+const Rp = uncalibrateRxRy(sbsRightImg, R, rx, ry);
+
+showDetailBoxAt(
+  e, leftDetail, leftDetailImg, sbsLeftImg, L, Lp.rx, Lp.ry,
   "left", zoom, size, 0,
   { x: groupX, y: groupY }
 );
 
 showDetailBoxAt(
-  e, rightDetail, rightDetailImg, sbsRightImg, R, rx, ry,
+  e, rightDetail, rightDetailImg, sbsRightImg, R, Rp.rx, Rp.ry,
   "right", zoom, size, 0,
- { x: groupX + size, y: groupY }
+  { x: groupX + size, y: groupY }
 );
   return;
 }
@@ -2085,32 +2088,6 @@ showDetailBoxAt(
     bottom: host.top + lbT + uH
   };
 
-  const inUsable =
-    e.clientX >= usableRect.left && e.clientX <= usableRect.right &&
-    e.clientY >= usableRect.top  && e.clientY <= usableRect.bottom;
-
-  if(!inUsable){
-    leftDetail.style.display = "none";
-    rightDetail.style.display = "none";
-    return;
-  }
-
-  // 2) rx/ry PER IMAGE op basis van de getransformeerde img rects
-  const rectL = getFittedImageRect(afterImgTag);
-const rectR = getFittedImageRect(beforeImgTag);
-
-  const rxL = (e.clientX - rectL.left) / rectL.width;
-  const ryL = (e.clientY - rectL.top)  / rectL.height;
-
-  const rxR = (e.clientX - rectR.left) / rectR.width;
-  const ryR = (e.clientY - rectR.top)  / rectR.height;
-
- const cfg = getDetailConfig();
-
-const showL = showDetailBoxAt(
-  e, leftDetail, leftDetailImg, afterImgTag,
-  rectL, rxL, ryL, "left", cfg.zoom, cfg.size, 0
-);
 
 const showR = showDetailBoxAt(
   e, rightDetail, rightDetailImg, beforeImgTag,
