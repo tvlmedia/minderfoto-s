@@ -1487,7 +1487,7 @@ rightLabel.innerHTML = `Lens: <a href="${ru}" target="_blank" rel="noopener nore
   setDownloadButton(downloadLeftRawButton,  `${LL}_${lf}_t${tL}`);
   setDownloadButton(downloadRightRawButton, `${RR}_${rf}_t${tR}`);
 
-  // SBS ook updaten
+    // SBS ook updaten
   if(sbsActive){
     setImageWithFallback(sbsLeftImg,  leftCandidates);
     setImageWithFallback(sbsRightImg, rightCandidates);
@@ -2031,16 +2031,19 @@ groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
 groupX = Math.round(groupX);
 groupY = Math.round(groupY);
 
-  showDetailBoxAt(
-  e, leftDetail, leftDetailImg, sbsLeftImg, L, rx, ry,
+const Lp = uncalibrateRxRy(sbsLeftImg,  L, rx, ry);
+const Rp = uncalibrateRxRy(sbsRightImg, R, rx, ry);
+
+showDetailBoxAt(
+  e, leftDetail, leftDetailImg, sbsLeftImg, L, Lp.rx, Lp.ry,
   "left", zoom, size, 0,
   { x: groupX, y: groupY }
 );
 
 showDetailBoxAt(
-  e, rightDetail, rightDetailImg, sbsRightImg, R, rx, ry,
+  e, rightDetail, rightDetailImg, sbsRightImg, R, Rp.rx, Rp.ry,
   "right", zoom, size, 0,
- { x: groupX + size, y: groupY }
+  { x: groupX + size, y: groupY }
 );
   return;
 }
@@ -2070,27 +2073,53 @@ showDetailBoxAt(
     return;
   }
 
-  // 2) rx/ry PER IMAGE op basis van de getransformeerde img rects
-  const rectL = getFittedImageRect(afterImgTag);
+ // 2) rx/ry PER IMAGE ...
+const rectL = getFittedImageRect(afterImgTag);
 const rectR = getFittedImageRect(beforeImgTag);
 
-  const rxL = (e.clientX - rectL.left) / rectL.width;
-  const ryL = (e.clientY - rectL.top)  / rectL.height;
+const rxL = (e.clientX - rectL.left) / rectL.width;
+const ryL = (e.clientY - rectL.top)  / rectL.height;
 
-  const rxR = (e.clientX - rectR.left) / rectR.width;
-  const ryR = (e.clientY - rectR.top)  / rectR.height;
+const rxR = (e.clientX - rectR.left) / rectR.width;
+const ryR = (e.clientY - rectR.top)  / rectR.height;
 
- const cfg = getDetailConfig();
+const cfg = getDetailConfig();
+const size = cfg.size;
+const zoom = cfg.zoom;
+
+const pad = 8;
+const gap = 0; // ✅ geen ruimte tussen de twee boxes
+
+// ✅ 1x clamp voor het hele duo
+const groupW = (size * 2) + gap;
+
+// Als gap=0 wil je meestal dat je cursor ongeveer op de “naad” zit:
+let groupX = e.clientX - size;
+let groupY = e.clientY - (size / 2);
+
+groupX = clamp(groupX, pad, window.innerWidth  - groupW - pad);
+groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
+
+groupX = Math.round(groupX);
+groupY = Math.round(groupY);
+
+const pL = uncalibrateRxRy(afterImgTag,  rectL, rxL, ryL);
+const pR = uncalibrateRxRy(beforeImgTag, rectR, rxR, ryR);
 
 const showL = showDetailBoxAt(
   e, leftDetail, leftDetailImg, afterImgTag,
-  rectL, rxL, ryL, "left", cfg.zoom, cfg.size, 0
+  rectL, pL.rx, pL.ry, "left", zoom, size, 0,
+  { x: groupX, y: groupY }
 );
 
 const showR = showDetailBoxAt(
   e, rightDetail, rightDetailImg, beforeImgTag,
-  rectR, rxR, ryR, "right", cfg.zoom, cfg.size, 0
+  rectR, pR.rx, pR.ry, "right", zoom, size, 0,
+  { x: groupX + size, y: groupY } // ✅ direct naast elkaar
 );
+
+if(!showL) leftDetail.style.display  = "none";
+if(!showR) rightDetail.style.display = "none";
 
  if(!showL) leftDetail.style.display  = "none";
 if(!showR) rightDetail.style.display = "none";
