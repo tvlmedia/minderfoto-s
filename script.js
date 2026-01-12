@@ -2022,130 +2022,131 @@ function getFittedImageRect(imgEl){
 document.addEventListener("mousemove", (e) => {
   if(!detailActive) return;
 
- // ===== SBS MODE =====
-if(sbsActive){
-  const L = getFittedImageRect(sbsLeftImg);
-const R = getFittedImageRect(sbsRightImg);
+  // als er ergens een fout zit -> niet alles kapot maken
+  try {
+    const cfg  = getDetailConfig();
+    const size = cfg.size;
+    const zoom = cfg.zoom;
+    const pad  = 8;
 
-  const inL = (e.clientX >= L.left && e.clientX <= L.right && e.clientY >= L.top && e.clientY <= L.bottom);
-  const inR = (e.clientX >= R.left && e.clientX <= R.right && e.clientY >= R.top && e.clientY <= R.bottom);
+    // helper: als uncalibrateRxRy niet bestaat -> no-op
+    const uncal = (typeof window.uncalibrateRxRy === "function")
+      ? window.uncalibrateRxRy
+      : (imgEl, rect, rx, ry) => ({ rx, ry });
 
-  if(!inL && !inR){
-    leftDetail.style.display = "none";
-    rightDetail.style.display = "none";
-    return;
+    // ===== SBS MODE =====
+    if(sbsActive){
+      const L = getFittedImageRect(sbsLeftImg);
+      const R = getFittedImageRect(sbsRightImg);
+
+      const inL = (e.clientX >= L.left && e.clientX <= L.right && e.clientY >= L.top && e.clientY <= L.bottom);
+      const inR = (e.clientX >= R.left && e.clientX <= R.right && e.clientY >= R.top && e.clientY <= R.bottom);
+
+      if(!inL && !inR){
+        leftDetail.style.display  = "none";
+        rightDetail.style.display = "none";
+        return;
+      }
+
+      // rx/ry op basis van het pane waar je in zit
+      const rx = inL ? (e.clientX - L.left) / L.width  : (e.clientX - R.left) / R.width;
+      const ry = inL ? (e.clientY - L.top)  / L.height : (e.clientY - R.top)  / R.height;
+
+      // groep positioneren (2 boxes naast elkaar)
+      const groupW = size * 2;
+      let groupX = e.clientX - (groupW / 2);
+      let groupY = e.clientY - (size / 2);
+
+      groupX = clamp(groupX, pad, window.innerWidth  - groupW - pad);
+      groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
+
+      groupX = Math.round(groupX);
+      groupY = Math.round(groupY);
+
+      const Lp = uncal(sbsLeftImg,  L, rx, ry);
+      const Rp = uncal(sbsRightImg, R, rx, ry);
+
+      showDetailBoxAt(
+        e, leftDetail, leftDetailImg, sbsLeftImg, L, Lp.rx, Lp.ry,
+        "left", zoom, size, 0,
+        { x: groupX, y: groupY }
+      );
+
+      showDetailBoxAt(
+        e, rightDetail, rightDetailImg, sbsRightImg, R, Rp.rx, Rp.ry,
+        "right", zoom, size, 0,
+        { x: groupX + size, y: groupY }
+      );
+
+      return;
+    }
+
+    // ===== SLIDER MODE (before/after) =====
+    updateFullscreenBars(); // zorg dat _usableW/H + lb klopt
+
+    const host = comparisonWrapper.getBoundingClientRect();
+    const lbL = comparisonWrapper._lbLeft || 0;
+    const lbT = comparisonWrapper._lbTop  || 0;
+    const uW  = comparisonWrapper._usableW || host.width;
+    const uH  = comparisonWrapper._usableH || host.height;
+
+    const usableRect = {
+      left: host.left + lbL,
+      top:  host.top  + lbT,
+      right: host.left + lbL + uW,
+      bottom: host.top + lbT + uH
+    };
+
+    // buiten usable area? -> hide
+    if(e.clientX < usableRect.left || e.clientX > usableRect.right || e.clientY < usableRect.top || e.clientY > usableRect.bottom){
+      leftDetail.style.display  = "none";
+      rightDetail.style.display = "none";
+      return;
+    }
+
+    const rectL = getFittedImageRect(afterImgTag);   // left = after
+    const rectR = getFittedImageRect(beforeImgTag);  // right = before
+
+    // rx/ry per image
+    let rxL = (e.clientX - rectL.left) / rectL.width;
+    let ryL = (e.clientY - rectL.top)  / rectL.height;
+
+    let rxR = (e.clientX - rectR.left) / rectR.width;
+    let ryR = (e.clientY - rectR.top)  / rectR.height;
+
+    const Lp = uncal(afterImgTag,  rectL, rxL, ryL);
+    const Rp = uncal(beforeImgTag, rectR, rxR, ryR);
+
+    // groep positioneren (2 boxes naast elkaar)
+    const groupW = size * 2;
+    let groupX = e.clientX - (groupW / 2);
+    let groupY = e.clientY - (size / 2);
+
+    groupX = clamp(groupX, pad, window.innerWidth  - groupW - pad);
+    groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
+
+    groupX = Math.round(groupX);
+    groupY = Math.round(groupY);
+
+    showDetailBoxAt(
+      e, leftDetail, leftDetailImg, afterImgTag, rectL, Lp.rx, Lp.ry,
+      "left", zoom, size, 0,
+      { x: groupX, y: groupY }
+    );
+
+    showDetailBoxAt(
+      e, rightDetail, rightDetailImg, beforeImgTag, rectR, Rp.rx, Rp.ry,
+      "right", zoom, size, 0,
+      { x: groupX + size, y: groupY }
+    );
+
+  } catch(err){
+    // als er een fout is, verberg de boxes zodat je geen “stuck” UI krijgt
+    leftDetail && (leftDetail.style.display = "none");
+    rightDetail && (rightDetail.style.display = "none");
+    console.error("Detail viewer mousemove error:", err);
   }
-
-  const rx = inL ? (e.clientX - L.left) / L.width  : (e.clientX - R.left) / R.width;
-  const ry = inL ? (e.clientY - L.top)  / L.height : (e.clientY - R.top)  / R.height;
-
-  const cfg  = getDetailConfig();
-const size = cfg.size;
-const zoom = cfg.zoom;
-const pad  = 8;
-
-  // ✅ clamp 1x voor het hele duo
-  const groupW = size * 2;
-  let groupX = e.clientX - (groupW / 2);
-let groupY = e.clientY - (size / 2);
-
-groupX = clamp(groupX, pad, window.innerWidth  - groupW - pad);
-groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
-
-// ✅ subpixel seams fix
-groupX = Math.round(groupX);
-groupY = Math.round(groupY);
-
-const Lp = uncalibrateRxRy(sbsLeftImg,  L, rx, ry);
-const Rp = uncalibrateRxRy(sbsRightImg, R, rx, ry);
-
-showDetailBoxAt(
-  e, leftDetail, leftDetailImg, sbsLeftImg, L, Lp.rx, Lp.ry,
-  "left", zoom, size, 0,
-  { x: groupX, y: groupY }
-);
-
-showDetailBoxAt(
-  e, rightDetail, rightDetailImg, sbsRightImg, R, Rp.rx, Rp.ry,
-  "right", zoom, size, 0,
-  { x: groupX + size, y: groupY }
-);
-  return;
-}
-
-  // ===== SLIDER MODE (before/after) =====
-  // 1) eerst checken of cursor in usable window zit (geen letterbox)
-  const host = comparisonWrapper.getBoundingClientRect();
-  const lbL = comparisonWrapper._lbLeft || 0;
-  const lbT = comparisonWrapper._lbTop  || 0;
-  const uW  = comparisonWrapper._usableW || host.width;
-  const uH  = comparisonWrapper._usableH || host.height;
-
-  const usableRect = {
-    left: host.left + lbL,
-    top:  host.top  + lbT,
-    right: host.left + lbL + uW,
-    bottom: host.top + lbT + uH
-  };
-
-
-const showR = showDetailBoxAt(
-  e, rightDetail, rightDetailImg, beforeImgTag,
-  rectR, rxR, ryR, "right", cfg.zoom, cfg.size, 0
-);
-
- if(!showL) leftDetail.style.display  = "none";
-if(!showR) rightDetail.style.display = "none";
-}); // <-- SLUIT de mousemove listener HIER af
-
-
-
-function updateFullscreenBars(){
-  // ✅ nooit padding gebruiken voor bars (anders raakt clip/slider space out of sync)
-  comparisonWrapper.style.padding = "0px";
-  comparisonWrapper.style.boxSizing = "border-box";
-
-  if(sbsActive){
-    ["--lb-top","--lb-bottom","--lb-left","--lb-right"].forEach(v=>comparisonWrapper.style.setProperty(v,"0px"));
-    comparisonWrapper._lbLeft=comparisonWrapper._lbRight=comparisonWrapper._lbTop=comparisonWrapper._lbBottom=0;
-
-    const r = comparisonWrapper.getBoundingClientRect();
-    comparisonWrapper._usableW = r.width;
-    comparisonWrapper._usableH = r.height;
-    return;
-  }
-
-  const rect = comparisonWrapper.getBoundingClientRect();
-  const hostW = Math.max(1, Math.round(rect.width));
-  const hostH = Math.max(1, Math.round(rect.height));
-  const targetAR = getTargetAR();
-  const hostAR = hostW / hostH;
-
-  let usedW, usedH;
-  let lbL = 0, lbR = 0, lbT = 0, lbB = 0;
-
-  if(hostAR > targetAR){
-    usedH = hostH;
-    usedW = Math.round(usedH * targetAR);
-    const leftover = hostW - usedW;
-    lbL = Math.floor(leftover / 2);
-    lbR = leftover - lbL;
-  } else {
-    usedW = hostW;
-    usedH = Math.round(usedW / targetAR);
-    const leftover = hostH - usedH;
-    lbT = Math.floor(leftover / 2);
-    lbB = leftover - lbT;
-  }
-
-  [["--lb-top",lbT],["--lb-bottom",lbB],["--lb-left",lbL],["--lb-right",lbR]]
-    .forEach(([k,v]) => comparisonWrapper.style.setProperty(k, `${v}px`));
-
-  Object.assign(comparisonWrapper, {
-    _lbLeft: lbL, _lbRight: lbR, _lbTop: lbT, _lbBottom: lbB,
-    _usableW: usedW, _usableH: usedH
-  });
-}
+});
 function resetSplitToMiddle(){
   if(sbsActive) return;
   if(document.body.classList.contains("dragging")) return;
