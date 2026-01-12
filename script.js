@@ -1354,6 +1354,11 @@ function setCalVars(img, dx=0, dy=0, sc=1){
   img.style.setProperty("--cal-tx", `${dx}px`);
   img.style.setProperty("--cal-ty", `${dy}px`);
   img.style.setProperty("--cal-scale", String(sc));
+
+  // ✅ forceer de echte transform inline (geen CSS mismatch meer)
+  const viewer = (typeof userScale === "number") ? userScale : 1;
+  img.style.transformOrigin = "center center";
+  img.style.transform = `translate(${dx}px, ${dy}px) scale(${sc * viewer})`;
 }
 
 function applyCalibrationTransforms(){
