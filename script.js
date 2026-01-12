@@ -966,7 +966,7 @@ function updateLensOptionsForCurrentFocal(){
 
 // === Bokeh toggle (zonder ON/OFF tekst) ===
 bokehToggle.dataset.mode = bokehToggle.dataset.mode || "portrait";
-bokehToggle.textContent = "BOKEH";
+bokehToggle.textContent = "Bokeh (B)";
 bokehToggle.classList.toggle("active", bokehToggle.dataset.mode === "bokeh");
 bokehToggle.setAttribute("aria-pressed", bokehToggle.dataset.mode === "bokeh");
 
@@ -987,7 +987,7 @@ exposureBtn?.addEventListener("click", () => {
 
 /* Flare: 3 standen */
 flareToggle.dataset.mode = flareToggle.dataset.mode || "noflare";
-const flareLabel = (m)=> m==="noflare" ? "Flare: OFF" : (m==="flare" ? "Flare: ON" : "Dual Flare: ON");
+const flareLabel = (m)=> m==="noflare" ? "Flare: OFF (F)" : (m==="flare" ? "Flare: ON" : "Dual Flare: ON");
 flareToggle.textContent = flareLabel(flareToggle.dataset.mode);
 
 flareToggle.addEventListener("click", ()=>{
