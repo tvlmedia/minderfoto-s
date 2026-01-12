@@ -2167,6 +2167,39 @@ function uncalibrateRxRy(imgEl, rect, rx, ry, rectIsPreOuter = false){
   return { rx: u, ry: v };
 }
 
+function uncalibrateRxRySlider(imgEl, rect, rx, ry){
+  if(!imgEl || !rect) return { rx, ry };
+
+  const cs = getComputedStyle(imgEl);
+
+  const tx = parseFloat(cs.getPropertyValue("--cal-tx")) || 0;
+  const ty = parseFloat(cs.getPropertyValue("--cal-ty")) || 0;
+  const sc = parseFloat(cs.getPropertyValue("--cal-scale")) || 1;
+
+  const outer = getOuterViewerScale(); // sensor * viewer
+
+  let u = rx;
+  let v = ry;
+
+  // 1) undo OUTER scale (rond center)
+  if(outer !== 1){
+    u = (u - 0.5) / outer + 0.5;
+    v = (v - 0.5) / outer + 0.5;
+  }
+
+  // 2) undo TRANSLATE (na outer-undo is tx/ty "box space")
+  // ⚠️ normaliseer t.o.v. de *getekende* image-rect (rect.width/height)
+  u -= (tx / Math.max(1, rect.width));
+  v -= (ty / Math.max(1, rect.height));
+
+  // 3) undo CAL scale (rond center)
+  const inv = 1 / Math.max(0.0001, sc);
+  u = (u - 0.5) * inv + 0.5;
+  v = (v - 0.5) * inv + 0.5;
+
+  return { rx: u, ry: v };
+}
+
 document.addEventListener("mousemove", (e) => {
   if(!detailActive) return;
 
