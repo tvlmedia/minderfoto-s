@@ -986,14 +986,12 @@ if (sbsWrapper) sbsWrapper.style.display = "none";
 
 
 function getCalBoxFor(img){
-  // ✅ SBS: meet de viewport/pane, NIET de image (want die heeft transforms)
   if(sbsActive && img){
-    const pane = img.closest?.(".sbsPane") || img.parentElement; // pas class aan als jij anders heet
+    const pane = img.closest?.(".pane") || img.parentElement;
     const r = (pane?.getBoundingClientRect?.() || comparisonWrapper.getBoundingClientRect());
     return { w: Math.max(1, r.width), h: Math.max(1, r.height) };
   }
 
-  // Slider-mode: gebruik “usable window” (excl. letter/pillarbox)
   const rect = comparisonWrapper.getBoundingClientRect();
   const lbL = comparisonWrapper._lbLeft || 0;
   const lbR = comparisonWrapper._lbRight || 0;
@@ -1005,7 +1003,6 @@ function getCalBoxFor(img){
     h: Math.max(1, (comparisonWrapper._usableH ?? (rect.height - lbT - lbB)))
   };
 }
-
 function calScaleFor(img){
   const fit = (img ? getComputedStyle(img).objectFit : "cover") || "cover";
   const { w, h } = getCalBoxFor(img);
