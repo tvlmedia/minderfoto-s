@@ -523,15 +523,17 @@ button.active,
   will-change:clip-path;
 }
 
-/* images (keep JS transform vars intact) */
+/* ✅ ÉÉN bron voor transforms: slider + SBS */
 #beforeImgTag,
-#afterImgTag{
+#afterImgTag,
+#sbsLeftImg,
+#sbsRightImg{
   position:absolute;
   inset:0;
   width:100%;
   height:100%;
   object-fit:cover;
-  display:block;
+  object-position:center;
 
   --cal-tx: 0px;
   --cal-ty: 0px;
@@ -663,26 +665,7 @@ body.sbs-mode #sbsWrapper .pane:last-child{
   border-left:1px solid rgba(255,255,255,.08);
 }
 
-body.sbs-mode #sbsWrapper .pane img{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  object-position:center;
 
-  --cal-tx: 0px;
-  --cal-ty: 0px;
-  --cal-scale: 1;
-
-  transform:
-    scale(calc(var(--sensor-scale) * var(--viewer-scale)))
-    translate(var(--cal-tx), var(--cal-ty))
-    scale(var(--cal-scale));
-
-  transform-origin:center;
-  will-change:transform;
-}
 
 /* =========================================================
    INFO / LABELS
