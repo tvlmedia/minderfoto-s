@@ -406,27 +406,7 @@ if (advancedToggle && advancedPanel) {
     advancedToggle.blur();
   });
 }
-// ✅ HARD FIX: forceer dat ALLE viewer-images altijd de calibratie-vars gebruiken
-(function forceCalibratedTransform(){
-  const id = "tvl-cal-transform-fix";
-  if (document.getElementById(id)) return;
 
-  const st = document.createElement("style");
-  st.id = id;
-  st.textContent = `
-  #beforeImgTag, #afterImgTag, #sbsLeftImg, #sbsRightImg {
-    transform:
-      scale(var(--sensor-scale, 1))
-      scale(var(--viewer-scale, 1))
-      translate3d(var(--cal-tx, 0px), var(--cal-ty, 0px), 0)
-      scale(var(--cal-scale, 1)) !important;
-
-    transform-origin: center center !important;
-    will-change: transform;
-  }
-`;
-  document.head.appendChild(st);
-})();
 // ✅ Guard: als pulseFsBars niet bestaat → no-op
 const pulseFsBarsSafe = (opts) => {
   if (typeof window.pulseFsBars === "function") window.pulseFsBars(opts);
@@ -2039,41 +2019,6 @@ function getFittedImageRect(imgEl){
   };
 }
 
-function getOuterViewerScale(){
-  const sensor = parseFloat(getComputedStyle(comparisonWrapper).getPropertyValue("--sensor-scale")) || 1;
-  const viewer = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--viewer-scale")) || 1;
-  return sensor * viewer;
-}
-
-// Zet rx/ry (0..1 in de VIEWER) om naar rx/ry (0..1 in de ONGETRANSFORMEERDE image)
-// zodat de detail-zoom exact de gecalibreerde view volgt.
-function uncalibrateRxRy(imgEl, rect, rx, ry){
-  if(!imgEl || !rect) return { rx, ry };
-
-  const cs = getComputedStyle(imgEl);
-
-  const tx = parseFloat(cs.getPropertyValue("--cal-tx")) || 0;
-  const ty = parseFloat(cs.getPropertyValue("--cal-ty")) || 0;
-  const sc = parseFloat(cs.getPropertyValue("--cal-scale")) || 1;
-
-  const outer = getOuterViewerScale();
-
-  // translate wordt in jouw transform nog vermenigvuldigd door outer-scale (maar niet door cal-scale)
-  const dxN = (tx * outer) / Math.max(1, rect.width);
-  const dyN = (ty * outer) / Math.max(1, rect.height);
-
-  // 1) undo translate
-  let u = rx - dxN;
-  let v = ry - dyN;
-
-  // 2) undo cal-scale (scale rond center)
-  const inv = 1 / Math.max(0.0001, sc);
-  u = (u - 0.5) * inv + 0.5;
-  v = (v - 0.5) * inv + 0.5;
-
-  return { rx: u, ry: v };
-}
-
 document.addEventListener("mousemove", (e) => {
   if(!detailActive) return;
 
@@ -2111,19 +2056,16 @@ groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
 groupX = Math.round(groupX);
 groupY = Math.round(groupY);
 
-const Lp = uncalibrateRxRy(sbsLeftImg,  L, rx, ry);
-const Rp = uncalibrateRxRy(sbsRightImg, R, rx, ry);
-
-showDetailBoxAt(
-  e, leftDetail, leftDetailImg, sbsLeftImg, L, Lp.rx, Lp.ry,
+  showDetailBoxAt(
+  e, leftDetail, leftDetailImg, sbsLeftImg, L, rx, ry,
   "left", zoom, size, 0,
   { x: groupX, y: groupY }
 );
 
 showDetailBoxAt(
-  e, rightDetail, rightDetailImg, sbsRightImg, R, Rp.rx, Rp.ry,
+  e, rightDetail, rightDetailImg, sbsRightImg, R, rx, ry,
   "right", zoom, size, 0,
-  { x: groupX + size, y: groupY }
+ { x: groupX + size, y: groupY }
 );
   return;
 }
@@ -2153,53 +2095,27 @@ showDetailBoxAt(
     return;
   }
 
- // 2) rx/ry PER IMAGE ...
-const rectL = getFittedImageRect(afterImgTag);
+  // 2) rx/ry PER IMAGE op basis van de getransformeerde img rects
+  const rectL = getFittedImageRect(afterImgTag);
 const rectR = getFittedImageRect(beforeImgTag);
 
-const rxL = (e.clientX - rectL.left) / rectL.width;
-const ryL = (e.clientY - rectL.top)  / rectL.height;
+  const rxL = (e.clientX - rectL.left) / rectL.width;
+  const ryL = (e.clientY - rectL.top)  / rectL.height;
 
-const rxR = (e.clientX - rectR.left) / rectR.width;
-const ryR = (e.clientY - rectR.top)  / rectR.height;
+  const rxR = (e.clientX - rectR.left) / rectR.width;
+  const ryR = (e.clientY - rectR.top)  / rectR.height;
 
-const cfg = getDetailConfig();
-const size = cfg.size;
-const zoom = cfg.zoom;
-
-const pad = 8;
-const gap = 0; // ✅ geen ruimte tussen de twee boxes
-
-// ✅ 1x clamp voor het hele duo
-const groupW = (size * 2) + gap;
-
-// Als gap=0 wil je meestal dat je cursor ongeveer op de “naad” zit:
-let groupX = e.clientX - size;
-let groupY = e.clientY - (size / 2);
-
-groupX = clamp(groupX, pad, window.innerWidth  - groupW - pad);
-groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
-
-groupX = Math.round(groupX);
-groupY = Math.round(groupY);
-
-const pL = uncalibrateRxRy(afterImgTag,  rectL, rxL, ryL);
-const pR = uncalibrateRxRy(beforeImgTag, rectR, rxR, ryR);
+ const cfg = getDetailConfig();
 
 const showL = showDetailBoxAt(
   e, leftDetail, leftDetailImg, afterImgTag,
-  rectL, pL.rx, pL.ry, "left", zoom, size, 0,
-  { x: groupX, y: groupY }
+  rectL, rxL, ryL, "left", cfg.zoom, cfg.size, 0
 );
 
 const showR = showDetailBoxAt(
   e, rightDetail, rightDetailImg, beforeImgTag,
-  rectR, pR.rx, pR.ry, "right", zoom, size, 0,
-  { x: groupX + size, y: groupY } // ✅ direct naast elkaar
+  rectR, rxR, ryR, "right", cfg.zoom, cfg.size, 0
 );
-
-if(!showL) leftDetail.style.display  = "none";
-if(!showR) rightDetail.style.display = "none";
 
  if(!showL) leftDetail.style.display  = "none";
 if(!showR) rightDetail.style.display = "none";
