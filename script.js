@@ -2124,7 +2124,7 @@ function getOuterViewerScale(){
 
 // Zet rx/ry (0..1 in de VIEWER) om naar rx/ry (0..1 in de ONGETRANSFORMEERDE image)
 // zodat de detail-zoom exact de gecalibreerde view volgt.
-function uncalibrateRxRy(imgEl, rect, rx, ry){
+function uncalibrateRxRy(imgEl, rect, rx, ry, rectIsPreOuter = false){
   if(!imgEl || !rect) return { rx, ry };
 
   const cs = getComputedStyle(imgEl);
@@ -2135,15 +2135,31 @@ function uncalibrateRxRy(imgEl, rect, rx, ry){
 
   const outer = getOuterViewerScale();
 
-  // translate wordt in jouw transform nog vermenigvuldigd door outer-scale (maar niet door cal-scale)
-  const dxN = (tx * outer) / Math.max(1, rect.width);
-  const dyN = (ty * outer) / Math.max(1, rect.height);
+  let u = rx;
+  let v = ry;
 
-  // 1) undo translate
-  let u = rx - dxN;
-  let v = ry - dyN;
+  // ✅ Alleen nodig als rect uit "pre-transform box space" komt (jouw slider-mode fix)
+  // Undo outer scale rond center
+  if(rectIsPreOuter && outer !== 1){
+    u = (u - 0.5) / outer + 0.5;
+    v = (v - 0.5) / outer + 0.5;
+  }
 
-  // 2) undo cal-scale (scale rond center)
+  // Undo translate:
+  // - bij preOuter rect: translate was nog NIET in outer-space → deel gewoon door rect.width/height
+  // - bij postOuter rect (SBS): jouw oude gedrag behouden (tx wordt door outer beïnvloed)
+  const dxN = rectIsPreOuter
+    ? (tx / Math.max(1, rect.width))
+    : ((tx * outer) / Math.max(1, rect.width));
+
+  const dyN = rectIsPreOuter
+    ? (ty / Math.max(1, rect.height))
+    : ((ty * outer) / Math.max(1, rect.height));
+
+  u -= dxN;
+  v -= dyN;
+
+  // Undo cal-scale rond center
   const inv = 1 / Math.max(0.0001, sc);
   u = (u - 0.5) * inv + 0.5;
   v = (v - 0.5) * inv + 0.5;
@@ -2268,9 +2284,9 @@ groupY = clamp(groupY, pad, window.innerHeight - size  - pad);
 groupX = Math.round(groupX);
 groupY = Math.round(groupY);
 
-const pL = uncalibrateRxRy(afterImgTag,  rectL, rxL, ryL);
-const pR = uncalibrateRxRy(beforeImgTag, rectR, rxR, ryR);
-
+const pL = uncalibrateRxRy(afterImgTag,  rectL, rxL, ryL, true);
+const pR = uncalibrateRxRy(beforeImgTag, rectR, rxR, ryR, true);
+  
 const showL = showDetailBoxAt(
   e, leftDetail, leftDetailImg, afterImgTag,
   rectL, pL.rx, pL.ry, "left", zoom, size, 0,
