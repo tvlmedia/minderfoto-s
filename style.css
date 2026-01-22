@@ -963,3 +963,54 @@ body.sbs-mode .controlsStack.desktop-only{
   transform-origin: center center !important;
   will-change: transform;
 }
+
+
+
+
+
+
+/* =========================
+   Compare Sensor UI
+   ========================= */
+
+.camRow{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.compareSensorGroup{
+  margin-left: auto;              /* duwt naar rechts */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.compareSensorWrap{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.compareSensorWrap select{
+  max-width: 220px;               /* tweak naar smaak */
+}
+
+/* =========================
+   Compare Sensor Outline
+   ========================= */
+#comparisonWrapper{
+  position: relative;             /* nodig voor absolute overlay */
+}
+
+#compareSensorOutline{
+  position: absolute;
+  pointer-events: none;
+  z-index: 7;                      /* boven images */
+  border: 2px solid #ffffff;
+  box-sizing: border-box;
+  opacity: 0.9;
+  display: none;                   /* default uit */
+}
