@@ -415,7 +415,7 @@ let compareSensorActive = false;
 
 // label element (1x)
 let compareSensorLabelEl = q("compareSensorLabel");
-if(!compareSensorLabelEl && compareOutline){
+if (!compareSensorLabelEl && compareOutline) {
   compareSensorLabelEl = document.createElement("div");
   compareSensorLabelEl.id = "compareSensorLabel";
   compareOutline.appendChild(compareSensorLabelEl);
@@ -453,6 +453,7 @@ function getCompareWH(){
 function updateCompareOutline(){
   if(!compareOutline) return;
 
+  // verberg in SBS of als uit staat
   if(!compareSensorActive || sbsActive){
     compareOutline.style.display = "none";
     if(compareSensorLabelEl){
@@ -473,6 +474,7 @@ function updateCompareOutline(){
     return;
   }
 
+  // zorgt dat _usableW/_usableH en lb offsets kloppen
   updateFullscreenBars();
 
   const rect = comparisonWrapper.getBoundingClientRect();
@@ -524,6 +526,7 @@ if(compareSensorToggle && compareSensorWrap && compareCameraSelect && compareSen
 
   compareSensorToggle.addEventListener("click", () => {
     compareSensorActive = !compareSensorActive;
+
     compareSensorToggle.setAttribute("aria-pressed", compareSensorActive ? "true" : "false");
     compareSensorToggle.classList.toggle("active", compareSensorActive);
 
