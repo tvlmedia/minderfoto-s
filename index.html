@@ -41,17 +41,41 @@
 
           <!-- Camera + Sensor -->
           <div class="row camRow">
-            <div class="field">
-              <label class="sr-only" for="cameraSelect">Camera</label>
-              <select id="cameraSelect"></select>
-            </div>
+  <div class="field">
+    <label class="sr-only" for="cameraSelect">Camera</label>
+    <select id="cameraSelect"></select>
+  </div>
 
-            <div class="field">
-              <label class="sr-only" for="sensorFormatSelect">Sensor mode</label>
-              <select id="sensorFormatSelect" disabled></select>
-            </div>
-          </div>
+  <div class="field">
+    <label class="sr-only" for="sensorFormatSelect">Sensor mode</label>
+    <select id="sensorFormatSelect" disabled></select>
+  </div>
 
+  <!-- ✅ Compare Sensor -->
+  <div class="compareSensorGroup">
+    <button
+      id="compareSensorToggle"
+      class="control-button"
+      type="button"
+      aria-pressed="false"
+      title="Compare a second sensor frame as an outline"
+    >
+      Compare sensor
+    </button>
+
+    <div id="compareSensorWrap" class="compareSensorWrap" style="display:none;">
+      <div class="field">
+        <label class="sr-only" for="compareCameraSelect">Compare camera</label>
+        <select id="compareCameraSelect"></select>
+      </div>
+
+      <div class="field">
+        <label class="sr-only" for="compareSensorFormatSelect">Compare sensor mode</label>
+        <select id="compareSensorFormatSelect" disabled></select>
+      </div>
+    </div>
+  </div>
+</div>
           <!-- Lens setup (Left / Focal / Right) -->
           <div class="row lensRow">
 
@@ -204,6 +228,10 @@
           <div id="leftDetail" class="detail-view-square"><img alt="Left zoom" /></div>
           <div id="rightDetail" class="detail-view-square"><img alt="Right zoom" /></div>
         </div>
+
+        <!-- ✅ Compare sensor outline overlay -->
+<div id="compareSensorOutline" aria-hidden="true"></div>
+        
       </section>
 
       <!-- =========================
