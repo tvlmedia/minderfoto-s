@@ -378,6 +378,8 @@ const fullscreenBtn=q("fullscreenButton"), sbsBtn=q("sbsToggle"), toggleBtn=q("t
 const downloadPdfButton = q("downloadPdfButton"); // ✅ HIER
 const detailOverlay=q("detailOverlay"), leftDetail=q("leftDetail"), rightDetail=q("rightDetail"), detailToggleButton=q("detailViewToggle");
 
+
+
 const advancedToggle = q("advancedToggle");
 const advancedPanel  = q("advancedPanel");
 
@@ -390,7 +392,15 @@ if (advancedToggle && advancedPanel) {
   });
 }
 
+const compareOutline      = q("compareSensorOutline");
 
+// ✅ maak label element (als het niet bestaat) en hang 'm aan de outline
+let compareSensorLabelEl = q("compareSensorLabel");
+if(!compareSensorLabelEl && compareOutline){
+  compareSensorLabelEl = document.createElement("div");
+  compareSensorLabelEl.id = "compareSensorLabel";
+  compareOutline.appendChild(compareSensorLabelEl);
+}
 
 /* =========================
    Compare Sensor (UI + Outline)
@@ -402,6 +412,14 @@ const compareSensorSelect = q("compareSensorFormatSelect");
 const compareOutline      = q("compareSensorOutline");
 
 let compareSensorActive = false;
+
+// label element (1x)
+let compareSensorLabelEl = q("compareSensorLabel");
+if(!compareSensorLabelEl && compareOutline){
+  compareSensorLabelEl = document.createElement("div");
+  compareSensorLabelEl.id = "compareSensorLabel";
+  compareOutline.appendChild(compareSensorLabelEl);
+}
 
 function fillCompareCameras(){
   if(!compareCameraSelect) return;
@@ -435,9 +453,12 @@ function getCompareWH(){
 function updateCompareOutline(){
   if(!compareOutline) return;
 
-  // Niet tonen in SBS of als toggle uit staat
   if(!compareSensorActive || sbsActive){
     compareOutline.style.display = "none";
+    if(compareSensorLabelEl){
+      compareSensorLabelEl.textContent = "";
+      compareSensorLabelEl.style.display = "none";
+    }
     return;
   }
 
@@ -445,10 +466,13 @@ function updateCompareOutline(){
   const cmp = getCompareWH();
   if(!cur || !cmp){
     compareOutline.style.display = "none";
+    if(compareSensorLabelEl){
+      compareSensorLabelEl.textContent = "";
+      compareSensorLabelEl.style.display = "none";
+    }
     return;
   }
 
-  // Zorg dat usable rect up-to-date is
   updateFullscreenBars();
 
   const rect = comparisonWrapper.getBoundingClientRect();
@@ -471,13 +495,21 @@ function updateCompareOutline(){
   compareOutline.style.width  = `${Math.round(boxW)}px`;
   compareOutline.style.height = `${Math.round(boxH)}px`;
   compareOutline.style.display = "block";
+
+  if(compareSensorLabelEl){
+    const cam = compareCameraSelect?.value || "";
+    const fmt = compareSensorSelect?.value || "";
+    const fmtLabel = cameras?.[cam]?.[fmt]?.label || fmt;
+    const t = (cam && fmtLabel) ? `Compare: ${cam} — ${fmtLabel}` : "";
+    compareSensorLabelEl.textContent = t;
+    compareSensorLabelEl.style.display = t ? "block" : "none";
+  }
 }
 
 // init + listeners
 if(compareSensorToggle && compareSensorWrap && compareCameraSelect && compareSensorSelect){
   fillCompareCameras();
 
-  // default: match current camera/mode
   compareCameraSelect.value = cameraSelect?.value || compareCameraSelect.options[0]?.value || "";
   fillCompareFormatsFor(compareCameraSelect.value);
   compareSensorSelect.value = sensorFormatSelect?.value || compareSensorSelect.options[0]?.value || "";
@@ -488,19 +520,22 @@ if(compareSensorToggle && compareSensorWrap && compareCameraSelect && compareSen
     updateCompareOutline();
   });
 
-  compareSensorSelect.addEventListener("change", () => {
-    updateCompareOutline();
-  });
+  compareSensorSelect.addEventListener("change", updateCompareOutline);
 
   compareSensorToggle.addEventListener("click", () => {
     compareSensorActive = !compareSensorActive;
     compareSensorToggle.setAttribute("aria-pressed", compareSensorActive ? "true" : "false");
     compareSensorToggle.classList.toggle("active", compareSensorActive);
 
+    document.body.classList.toggle("compare-sensor-on", compareSensorActive);
     compareSensorWrap.style.display = compareSensorActive ? "flex" : "none";
+
     updateCompareOutline();
     compareSensorToggle.blur();
   });
+
+  compareSensorWrap.style.display = "none";
+  updateCompareOutline();
 }
 // ✅ HARD FIX: forceer dat ALLE viewer-images altijd de calibratie-vars gebruiken
 (function forceCalibratedTransform(){
