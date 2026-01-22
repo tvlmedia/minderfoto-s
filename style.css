@@ -1036,23 +1036,4 @@ body.compare-sensor-on #compareSensorOutline{
     0 0 22px rgba(255,124,0,.14);
 }
 
-/* als je border gebruikt */
-#compareSensorOutline{
-  border-color: var(--ol);
-}
 
-#compareSensorOutline::after{
-  content: attr(data-label);
-  position:absolute;
-  top:-12px;
-  left:12px;
-  padding:6px 10px;
-  border-radius:999px;
-  background: rgba(0,0,0,.60);
-  border: 1px solid rgba(255,255,255,.12);
-  color: rgba(255,255,255,.78);
-  font-size: 11px;
-  letter-spacing:.08em;
-  text-transform:uppercase;
-  backdrop-filter: blur(8px);
-}
