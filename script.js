@@ -389,6 +389,119 @@ if (advancedToggle && advancedPanel) {
     advancedToggle.blur();
   });
 }
+
+
+
+/* =========================
+   Compare Sensor (UI + Outline)
+   ========================= */
+const compareSensorToggle = q("compareSensorToggle");
+const compareSensorWrap   = q("compareSensorWrap");
+const compareCameraSelect = q("compareCameraSelect");
+const compareSensorSelect = q("compareSensorFormatSelect");
+const compareOutline      = q("compareSensorOutline");
+
+let compareSensorActive = false;
+
+function fillCompareCameras(){
+  if(!compareCameraSelect) return;
+  compareCameraSelect.innerHTML = "";
+  Object.keys(cameras).forEach(cam => compareCameraSelect.add(new Option(cam, cam)));
+}
+
+function fillCompareFormatsFor(cam){
+  if(!compareSensorSelect) return;
+  compareSensorSelect.innerHTML = "";
+
+  if(!cam || !cameras?.[cam]){
+    compareSensorSelect.disabled = true;
+    return;
+  }
+
+  Object.entries(cameras[cam]).forEach(([k,v]) => {
+    compareSensorSelect.add(new Option(v.label || k, k));
+  });
+
+  compareSensorSelect.disabled = false;
+}
+
+function getCompareWH(){
+  const cam = compareCameraSelect?.value;
+  const fmt = compareSensorSelect?.value;
+  const hit = cam && fmt && cameras?.[cam]?.[fmt];
+  return hit || null;
+}
+
+function updateCompareOutline(){
+  if(!compareOutline) return;
+
+  // Niet tonen in SBS of als toggle uit staat
+  if(!compareSensorActive || sbsActive){
+    compareOutline.style.display = "none";
+    return;
+  }
+
+  const cur = getCurrentWH();
+  const cmp = getCompareWH();
+  if(!cur || !cmp){
+    compareOutline.style.display = "none";
+    return;
+  }
+
+  // Zorg dat usable rect up-to-date is
+  updateFullscreenBars();
+
+  const rect = comparisonWrapper.getBoundingClientRect();
+  const lbL  = comparisonWrapper._lbLeft   || 0;
+  const lbT  = comparisonWrapper._lbTop    || 0;
+  const uW   = Math.max(1, comparisonWrapper._usableW || rect.width);
+  const uH   = Math.max(1, comparisonWrapper._usableH || rect.height);
+
+  const ratioW = (cmp.w / cur.w);
+  const ratioH = (cmp.h / cur.h);
+
+  const boxW = uW * ratioW;
+  const boxH = uH * ratioH;
+
+  const left = lbL + (uW - boxW) / 2;
+  const top  = lbT + (uH - boxH) / 2;
+
+  compareOutline.style.left   = `${Math.round(left)}px`;
+  compareOutline.style.top    = `${Math.round(top)}px`;
+  compareOutline.style.width  = `${Math.round(boxW)}px`;
+  compareOutline.style.height = `${Math.round(boxH)}px`;
+  compareOutline.style.display = "block";
+}
+
+// init + listeners
+if(compareSensorToggle && compareSensorWrap && compareCameraSelect && compareSensorSelect){
+  fillCompareCameras();
+
+  // default: match current camera/mode
+  compareCameraSelect.value = cameraSelect?.value || compareCameraSelect.options[0]?.value || "";
+  fillCompareFormatsFor(compareCameraSelect.value);
+  compareSensorSelect.value = sensorFormatSelect?.value || compareSensorSelect.options[0]?.value || "";
+
+  compareCameraSelect.addEventListener("change", () => {
+    fillCompareFormatsFor(compareCameraSelect.value);
+    compareSensorSelect.value = compareSensorSelect.options[0]?.value || "";
+    updateCompareOutline();
+  });
+
+  compareSensorSelect.addEventListener("change", () => {
+    updateCompareOutline();
+  });
+
+  compareSensorToggle.addEventListener("click", () => {
+    compareSensorActive = !compareSensorActive;
+    compareSensorToggle.setAttribute("aria-pressed", compareSensorActive ? "true" : "false");
+    compareSensorToggle.classList.toggle("active", compareSensorActive);
+
+    compareSensorWrap.style.display = compareSensorActive ? "flex" : "none";
+    updateCompareOutline();
+    compareSensorToggle.blur();
+  });
+}
 // ✅ HARD FIX: forceer dat ALLE viewer-images altijd de calibratie-vars gebruiken
 (function forceCalibratedTransform(){
   const id = "tvl-cal-transform-fix";
@@ -822,18 +935,22 @@ function applyCurrentFormat(){
   const scale = Math.abs(BASE_SENSOR.w - w) < 0.1 ? 1 : (BASE_SENSOR.w / w);
   comparisonWrapper.style.setProperty("--sensor-scale", scale.toFixed(4));
 
-  // ✅ WACHT 1 FRAME zodat de nieuwe hoogte/usable rect echt klopt
-  requestAnimationFrame(() => {
-    updateFullscreenBars();
-    resetSplitToMiddle();
 
-    if (calibrateActive) {
-      if (!calibrateUserTouchedScale) autoScaleForCalibration();
-      else applyCalibrationTransforms();
-    } else {
-      applyCalibrationTransforms();
-    }
-  });
+  
+  // ✅ WACHT 1 FRAME zodat de nieuwe hoogte/usable rect echt klopt
+ requestAnimationFrame(() => {
+  updateFullscreenBars();
+  resetSplitToMiddle();
+
+  if (calibrateActive) {
+    if (!calibrateUserTouchedScale) autoScaleForCalibration();
+    else applyCalibrationTransforms();
+  } else {
+    applyCalibrationTransforms();
+  }
+
+  updateCompareOutline(); // ✅ A
+});
 }
 /* === Lenses dropdowns + T-stops === */
 lenses.forEach(l=>{ leftSelect.add(new Option(l,l)); rightSelect.add(new Option(l,l)); });
@@ -1629,25 +1746,25 @@ function onFsChange(){
     }
   }
 
-  scheduleLayoutStabilize();
+ scheduleLayoutStabilize();
+updateCompareOutline(); // ✅ B
 }
 
 document.addEventListener("fullscreenchange",onFsChange);
 document.addEventListener("webkitfullscreenchange",onFsChange);
-window.addEventListener("resize",()=>{
+window.addEventListener("resize", () => {
   if(isWrapperFullscreen()){
     updateFullscreenBars();
     resetSplitToMiddle();
 
-    if(calibrateActive){
-      autoScaleForCalibration();
-    } else {
-      applyCalibrationTransforms();
-    }
+    if(calibrateActive) autoScaleForCalibration();
+    else applyCalibrationTransforms();
   } else {
     const {w,h}=getCurrentWH();
     setWrapperSizeByAR(w,h);
   }
+
+  updateCompareOutline(); // ✅ C
 });
 async function toggleFullscreen(){
  if(isWrapperFullscreen()){
@@ -1700,6 +1817,7 @@ function setSideBySide(on,{force=false}={}) {
 
   applyCalibrationTransforms();
   updateToggleHighlights();
+  updateCompareOutline(); // ✅ D
 }
 
 sbsBtn?.addEventListener("click",()=>setSideBySide(!sbsActive));
