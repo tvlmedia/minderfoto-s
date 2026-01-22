@@ -1036,4 +1036,66 @@ body.compare-sensor-on #compareSensorOutline{
     0 0 22px rgba(255,124,0,.14);
 }
 
+/* =========================
+   Compare Sensor Outline
+   ========================= */
+#compareSensorOutline{
+  position:absolute;
+  pointer-events:none;
+  z-index:7;
 
+  border: 1.5px solid rgba(255,255,255,.72);
+
+  /* ✅ GEEN afgeronde hoeken */
+  border-radius: 0;
+
+  opacity: 1;
+  display:none;
+
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.55) inset,
+    0 10px 26px rgba(0,0,0,.35),
+    0 0 22px rgba(255,124,0,.10);
+}
+
+/* ✅ Label (tekst) boven de outline */
+#compareSensorLabel{
+  position:absolute;
+  left:0;
+  top:-30px;
+
+  padding:6px 10px;
+  font-size:11px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  white-space:nowrap;
+
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(245,245,245,.90);
+
+  /* ✅ ook label: geen rounded */
+  border-radius:0;
+
+  box-shadow: 0 10px 22px rgba(0,0,0,.45);
+
+  display:none; /* default uit */
+}
+
+/* ✅ Als label leeg is: verberg -> dit voorkomt “dat kleine blokje” */
+#compareSensorLabel:empty{
+  display:none !important;
+}
+
+/* ✅ Als compare sensor actief is: accent */
+body.compare-sensor-on #compareSensorOutline{
+  border-color: rgba(255,124,0,.70);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.55) inset,
+    0 0 22px rgba(255,124,0,.14);
+}
+
+body.compare-sensor-on #compareSensorLabel{
+  border-color: rgba(255,124,0,.55);
+  color: rgba(255,124,0,.92);
+}
