@@ -1006,11 +1006,53 @@ body.sbs-mode .controlsStack.desktop-only{
 }
 
 #compareSensorOutline{
-  position: absolute;
-  pointer-events: none;
-  z-index: 7;                      /* boven images */
-  border: 2px solid #ffffff;
-  box-sizing: border-box;
-  opacity: 0.9;
-  display: none;                   /* default uit */
+  position:absolute;
+  pointer-events:none;
+  z-index:7;
+
+  /* i.p.v. 2px hard wit */
+  border: 1.5px solid rgba(255,255,255,.72);
+  border-radius: 10px;
+  opacity: 1;
+  display:none;
+
+  /* maakt ‘m zichtbaar op zowel licht als donker beeld */
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.55) inset,
+    0 10px 26px rgba(0,0,0,.35),
+    0 0 22px rgba(255,124,0,.10);
+}
+
+/* default */
+#compareSensorOutline{
+  --ol: rgba(255,255,255,.72);
+}
+
+/* als compare sensor actief is -> oranje accent */
+body.compare-sensor-on #compareSensorOutline{
+  --ol: rgba(255,124,0,.70);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.55) inset,
+    0 0 22px rgba(255,124,0,.14);
+}
+
+/* als je border gebruikt */
+#compareSensorOutline{
+  border-color: var(--ol);
+}
+
+#compareSensorOutline::after{
+  content: attr(data-label);
+  position:absolute;
+  top:-12px;
+  left:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  background: rgba(0,0,0,.60);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.78);
+  font-size: 11px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  backdrop-filter: blur(8px);
 }
