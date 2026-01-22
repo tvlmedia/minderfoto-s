@@ -2491,8 +2491,6 @@ const showR = showDetailBoxAt(
 if(!showL) leftDetail.style.display  = "none";
 if(!showR) rightDetail.style.display = "none";
 
- if(!showL) leftDetail.style.display  = "none";
-if(!showR) rightDetail.style.display = "none";
 }); // <-- SLUIT de mousemove listener HIER af
 
 
