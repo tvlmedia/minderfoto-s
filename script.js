@@ -392,15 +392,7 @@ if (advancedToggle && advancedPanel) {
   });
 }
 
-const compareOutline      = q("compareSensorOutline");
 
-// ✅ maak label element (als het niet bestaat) en hang 'm aan de outline
-let compareSensorLabelEl = q("compareSensorLabel");
-if(!compareSensorLabelEl && compareOutline){
-  compareSensorLabelEl = document.createElement("div");
-  compareSensorLabelEl.id = "compareSensorLabel";
-  compareOutline.appendChild(compareSensorLabelEl);
-}
 
 /* =========================
    Compare Sensor (UI + Outline)
