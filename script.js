@@ -1594,8 +1594,8 @@ function resolveImageCandidates(lens, nominalFocal, tStr, flareMode, sceneMode, 
 }
 
 function updateImages(){
-  const LL = leftSelect.value.toLowerCase().replace(/\s+/g,"_");
-  const RR = rightSelect.value.toLowerCase().replace(/\s+/g,"_");
+  const LL = lensSlugFromLabel(leftSelect.value);
+const RR = lensSlugFromLabel(rightSelect.value);
 
    const uiFocal = focalLengthSelect.value;
 
