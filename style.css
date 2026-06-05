@@ -243,13 +243,6 @@ body.sbs-mode .controlsStack.desktop-only{
 }
 .controlsBottom .actionLeft::-webkit-scrollbar{ display:none; }
 
-.controlsBottom .actionRight{
-  flex:0 0 auto;
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-}
-
 /* advanced panel */
 #advancedPanel.advancedPanel{
   display:none;
