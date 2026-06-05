@@ -49,11 +49,13 @@
     <select id="sensorFormatSelect" disabled></select>
   </div>
 
-  <!-- ✅ Compare Sensor -->
-  <div class="compareSensorGroup">
-    <button
-      id="compareSensorToggle"
-      class="control-button"
+	  <!-- ✅ Compare Sensor -->
+	  <div class="compareSensorGroup">
+	    <button id="comparisonToggle" class="control-button active" type="button" aria-pressed="true">Comparison: ON</button>
+
+	    <button
+	      id="compareSensorToggle"
+	      class="control-button"
       type="button"
       aria-pressed="false"
       title="Compare a second sensor frame as an outline"
@@ -139,7 +141,6 @@
          <div class="row actionRow">
 	 <div class="actionLeft">
 	  <button id="toggleButton" class="control-button" type="button">↔ Flip</button>
-	  <button id="comparisonToggle" class="control-button active" type="button" aria-pressed="true">Comparison: ON</button>
 	  <button id="sbsToggle" class="control-button" type="button">Side-by-Side (S)</button>
 	  <button id="fullscreenButton" class="control-button" type="button">⛶ Fullscreen (P)</button>
   <button id="detailViewToggle" class="control-button" type="button">🔍 Detail View (D)</button>
