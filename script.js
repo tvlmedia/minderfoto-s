@@ -406,8 +406,11 @@ const exposureBtn = q("exposureToggle");
 let exposureCorrectionActive = true; // ✅ default ON
 
 const fullscreenBtn=q("fullscreenButton"), sbsBtn=q("sbsToggle"), toggleBtn=q("toggleButton"), infoContainer=q("infoContainer");
+const comparisonBtn=q("comparisonToggle");
 const downloadPdfButton = q("downloadPdfButton"); // ✅ HIER
 const detailOverlay=q("detailOverlay"), leftDetail=q("leftDetail"), rightDetail=q("rightDetail"), detailToggleButton=q("detailViewToggle");
+
+let comparisonActive = true;
 
 
 
@@ -712,7 +715,7 @@ function updateMfAltUI(){
   const rightSlug = lensSlugFromLabel(rightSelect?.value || "");
 
   const leftOpts  = ALT_FOCAL_OPTIONS?.[leftSlug]?.[uiFocal]  || null;
-  const rightOpts = ALT_FOCAL_OPTIONS?.[rightSlug]?.[uiFocal] || null;
+  const rightOpts = comparisonActive ? (ALT_FOCAL_OPTIONS?.[rightSlug]?.[uiFocal] || null) : null;
 
   // LEFT
   if(mfAltLeftWrap && mfAltLeftSel){
@@ -779,8 +782,8 @@ function displayFocalForUI(lensSlug, uiFocal){
   return String(f).toUpperCase();
 }
 
-// Bouw focal dropdown op basis van de *huidige* lens links+rechts.
-// Alleen focals die beide lenzen echt hebben blijven zichtbaar.
+// Bouw focal dropdown op basis van de huidige lenskeuze.
+// In comparison mode moeten beide lenzen de focal hebben; in single mode alleen links.
 function updateFocalOptionsForCurrentLenses(){
   if(!focalLengthSelect) return { changed:false, valids:UI_FOCALS.slice() };
 
@@ -789,10 +792,11 @@ function updateFocalOptionsForCurrentLenses(){
   const leftSlug  = lensSlugFromLabel(leftSelect?.value || "");
   const rightSlug = lensSlugFromLabel(rightSelect?.value || "");
 
-  let valids = UI_FOCALS.filter(f =>
-    lensSupportsUIFocal(leftSlug,  f, "left") &&
-    lensSupportsUIFocal(rightSlug, f, "right")
-  );
+  let valids = UI_FOCALS.filter(f => {
+    const leftOk = lensSupportsUIFocal(leftSlug, f, "left");
+    if(!comparisonActive) return leftOk;
+    return leftOk && lensSupportsUIFocal(rightSlug, f, "right");
+  });
 
   // safety fallback (zou in praktijk niet moeten gebeuren)
   if(!valids.length) valids = UI_FOCALS.slice();
@@ -1130,7 +1134,9 @@ function updateLensOptionsForCurrentFocal(){
   const uiFocal = focalLengthSelect?.value || "50mm";
 
   refillLensSelectForFocal(leftSelect,  "left",  uiFocal);
-  refillLensSelectForFocal(rightSelect, "right", uiFocal);
+  if(comparisonActive){
+    refillLensSelectForFocal(rightSelect, "right", uiFocal);
+  }
 
   // MF alt UI moet nu ook kloppen voor nieuwe lensset
   updateMfAltUI();
@@ -1355,9 +1361,56 @@ function setToggleActive(el, on){
   el.setAttribute("aria-pressed", on ? "true" : "false");
 }
 
+function updateComparisonModeUI(){
+  document.body.classList.toggle("single-lens-mode", !comparisonActive);
+  comparisonWrapper?.setAttribute("aria-label", comparisonActive ? "Comparison viewer" : "Single lens viewer");
+
+  if(comparisonBtn){
+    comparisonBtn.textContent = comparisonActive ? "Comparison: ON" : "Comparison: OFF";
+    setToggleActive(comparisonBtn, comparisonActive);
+  }
+
+  [sbsBtn, toggleBtn].forEach(btn => {
+    if(btn) btn.disabled = !comparisonActive;
+  });
+
+  if(!comparisonActive){
+    rightDetail && (rightDetail.style.display = "none");
+    if(rightLabel) rightLabel.textContent = "";
+  }
+
+  updateCompareOutline();
+}
+
+function setComparisonMode(on){
+  const next = !!on;
+  if(comparisonActive === next){
+    updateComparisonModeUI();
+    return;
+  }
+
+  comparisonActive = next;
+
+  if(!comparisonActive && sbsActive){
+    setSideBySide(false, { force:true });
+  }
+
+  updateComparisonModeUI();
+  updateFocalOptionsForCurrentLenses();
+  calibrateUserTouchedScale = false;
+  resetUserScale();
+  updateLensOptionsForCurrentFocal();
+}
+
+comparisonBtn?.addEventListener("click", () => {
+  setComparisonMode(!comparisonActive);
+  comparisonBtn.blur();
+});
+
 function updateToggleHighlights(){
   const isDetailOn = !!detailOverlay?.classList.contains("active");
 
+  setToggleActive(comparisonBtn, !!comparisonActive);
   setToggleActive(bokehToggle, (bokehToggle?.dataset.mode === "bokeh"));
   setToggleActive(flareToggle, (flareToggle?.dataset.mode && flareToggle.dataset.mode !== "noflare"));
   setToggleActive(sbsBtn, !!sbsActive);
@@ -1394,7 +1447,17 @@ function setDownloadButton(btn,key){
 }
 
 /* === Labels + lens info === */
-function updateLensInfo(){ const L=leftSelect.value,R=rightSelect.value; lensInfoDiv.innerHTML=`<p><strong>${L}:</strong> ${lensDescriptions[L]?.text||""}</p><p><strong>${R}:</strong> ${lensDescriptions[R]?.text||""}</p>`; }
+function updateLensInfo(){
+  const L = leftSelect.value;
+  const R = rightSelect.value;
+
+  if(!comparisonActive){
+    lensInfoDiv.innerHTML = `<p><strong>${L}:</strong> ${lensDescriptions[L]?.text || ""}</p>`;
+    return;
+  }
+
+  lensInfoDiv.innerHTML = `<p><strong>${L}:</strong> ${lensDescriptions[L]?.text || ""}</p><p><strong>${R}:</strong> ${lensDescriptions[R]?.text || ""}</p>`;
+}
 
 /* === Calibrate Function === */
 
@@ -1469,11 +1532,10 @@ const rightCal = getCal(rightSlug, rightFocal);
     const leftImg  = sbsActive ? sbsLeftImg  : afterImgTag;   // after = links
   const rightImg = sbsActive ? sbsRightImg : beforeImgTag;  // before = rechts
 
-  let required = Math.max(
-    1,
-    requiredScaleFor(leftImg,  leftCal),
-    requiredScaleFor(rightImg, rightCal)
-  );
+  let required = Math.max(1, requiredScaleFor(leftImg, leftCal));
+  if(comparisonActive){
+    required = Math.max(required, requiredScaleFor(rightImg, rightCal));
+  }
 
   required *= 1.005;
 
@@ -1694,14 +1756,17 @@ const uiTRLabel = `T${uiTR}`;
   const rfDisplay = String(rf).replace(/_m(35|50)$/, "");
 
   leftLabel.innerHTML  = `Lens: <a href="${lu}" target="_blank" rel="noopener noreferrer">${leftSelect.value} ${lfDisplay} ${uiTLLabel}${tLNote}</a>`;
-rightLabel.innerHTML = `Lens: <a href="${ru}" target="_blank" rel="noopener noreferrer">${rightSelect.value} ${rfDisplay} ${uiTRLabel}${tRNote}</a>`;
+  rightLabel.innerHTML = comparisonActive
+    ? `Lens: <a href="${ru}" target="_blank" rel="noopener noreferrer">${rightSelect.value} ${rfDisplay} ${uiTRLabel}${tRNote}</a>`
+    : "";
 
   // ✅ RAW download keys moeten matchen met je “file focal” (aliasFor) + file t-stop
   setDownloadButton(downloadLeftRawButton,  `${LL}_${lf}_t${tL}`);
-  setDownloadButton(downloadRightRawButton, `${RR}_${rf}_t${tR}`);
+  if(comparisonActive) setDownloadButton(downloadRightRawButton, `${RR}_${rf}_t${tR}`);
+  else setDownloadButton(downloadRightRawButton, "");
 
   // SBS ook updaten
-  if(sbsActive){
+  if(sbsActive && comparisonActive){
     setImageWithFallback(sbsLeftImg,  leftCandidates);
     setImageWithFallback(sbsRightImg, rightCandidates);
   }
@@ -1725,6 +1790,7 @@ focalLengthSelect.value = "85mm";
 tStopLeftSelect.value   = "2.8";
 tStopRightSelect.value  = "2.8";
 
+updateComparisonModeUI();
 updateLensInfo();
 updateFocalOptionsForCurrentLenses();
 updateLensOptionsForCurrentFocal(); // ✅ bouwt lens dropdowns op basis van focal + updateMfAltUI + T-stops + images
@@ -1875,6 +1941,7 @@ fullscreenBtn?.addEventListener("click", toggleFullscreen);
 
 /* === SxS toggle === */
 function setSideBySide(on,{force=false}={}) {
+  if(!comparisonActive && on) on = false;
   if(isExportingPdf && !force) return; const next=!!on; if(!force && sbsActive===next) return; sbsActive=next;
   document.body.classList.toggle("sbs-mode",sbsActive); comparisonWrapper.classList.toggle("sbs-mode",sbsActive);
   const beforeWrapper=beforeImgTag.parentElement;
@@ -1896,6 +1963,7 @@ function setSideBySide(on,{force=false}={}) {
 
 sbsBtn?.addEventListener("click",()=>setSideBySide(!sbsActive));
 toggleBtn?.addEventListener("click",()=>{ 
+  if(!comparisonActive) return;
   resetUserScale();
 
   const l=leftSelect.value; leftSelect.value=rightSelect.value; rightSelect.value=l; 
@@ -2395,6 +2463,51 @@ function uncalibrateRxRySlider(imgEl, rect, rx, ry){
 document.addEventListener("mousemove", (e) => {
   if(!detailActive) return;
 
+  if(!comparisonActive){
+    const host = comparisonWrapper.getBoundingClientRect();
+    const lbL = comparisonWrapper._lbLeft || 0;
+    const lbT = comparisonWrapper._lbTop  || 0;
+    const uW  = comparisonWrapper._usableW || host.width;
+    const uH  = comparisonWrapper._usableH || host.height;
+
+    const usableRect = {
+      left: host.left + lbL,
+      top:  host.top  + lbT,
+      right: host.left + lbL + uW,
+      bottom: host.top + lbT + uH
+    };
+
+    const inUsable =
+      e.clientX >= usableRect.left && e.clientX <= usableRect.right &&
+      e.clientY >= usableRect.top  && e.clientY <= usableRect.bottom;
+
+    if(!inUsable){
+      leftDetail.style.display = "none";
+      rightDetail.style.display = "none";
+      return;
+    }
+
+    const usableBox = {
+      left: usableRect.left,
+      top: usableRect.top,
+      width: uW,
+      height: uH
+    };
+
+    const rectL = getFittedImageRectInBox(afterImgTag, usableBox);
+    const rxL = (e.clientX - rectL.left) / rectL.width;
+    const ryL = (e.clientY - rectL.top) / rectL.height;
+    const pL = uncalibrateRxRy(afterImgTag, rectL, rxL, ryL, true);
+
+    const cfg = getDetailConfig();
+    const side = (e.clientX > window.innerWidth - cfg.size - 32) ? "left" : "right";
+    const shown = showDetailBoxAt(e, leftDetail, leftDetailImg, afterImgTag, rectL, pL.rx, pL.ry, side, cfg.zoom, cfg.size, 18);
+
+    if(!shown) leftDetail.style.display = "none";
+    rightDetail.style.display = "none";
+    return;
+  }
+
  // ===== SBS MODE =====
 if(sbsActive){
   const L = getFittedImageRect(sbsLeftImg);
@@ -2589,6 +2702,17 @@ function resetSplitToMiddle(){
   const lbL  = comparisonWrapper._lbLeft   || 0;
   const lbT  = comparisonWrapper._lbTop    || 0;
 
+  if(!comparisonActive){
+    const full = "inset(0px 0px 0px 0px)";
+    afterWrapper.style.clipPath = full;
+    afterWrapper.style.webkitClipPath = full;
+    slider.style.left = lbL + "px";
+    slider.style.top = lbT + "px";
+    slider.style.height = usableH + "px";
+    slider.style.bottom = "auto";
+    return;
+  }
+
   const mid = Math.round(usableW / 2);
 
   // afterWrapper is nu al "inset naar usable window" via CSS, dus clip is puur usableW-space
@@ -2634,7 +2758,7 @@ function updateSliderPosition(clientX){
 let isDraggingSlider = false;
 
 function startSliderDrag(e){
-  if(sbsActive || isExportingPdf) return;
+  if(!comparisonActive || sbsActive || isExportingPdf) return;
 
   isDraggingSlider = true;
   document.body.classList.add("dragging");
@@ -2673,7 +2797,7 @@ window.addEventListener("pointercancel", endSliderDrag, { passive:false });
 
 // Optioneel: klik in het beeld = slider jump (nice UX)
 comparisonWrapper.addEventListener("pointerdown", (e) => {
-  if(sbsActive || isExportingPdf) return;
+  if(!comparisonActive || sbsActive || isExportingPdf) return;
   if(e.target === slider) return; // slider zelf handelt drag af
   updateFullscreenBars();
   updateSliderPosition(e.clientX);
@@ -2950,7 +3074,7 @@ async function exportLensPdf(){
     const leftURL  = afterImgTag?.src;   // left = after
     const rightURL = beforeImgTag?.src;  // right = before
 
-    if(!leftURL || !rightURL){
+    if(!leftURL || (comparisonActive && !rightURL)){
       alert("Images are not loaded yet — try again once the viewer is showing the image.");
       return;
     }
@@ -2961,6 +3085,30 @@ async function exportLensPdf(){
 
     // Bars helper (uses your drawBars)
     const bars = drawBars(pdf, TOP_BAR, BOTTOM_BAR, PAGE_MARGIN);
+
+    if(!comparisonActive){
+      pdf.setFillColor(0,0,0);
+      pdf.rect(0,0,pw,ph,"F");
+
+      const titleSingle = `${L_label} — ${focalShownLeft} — T${uiTL}`;
+      bars.top(titleSingle);
+
+      const singleOutH = 2200;
+      const singleRender = await renderToSensorAR(leftURL, sensorAR, singleOutH, 1, 0);
+      await placeContain(pdf, singleRender.dataURL, imgBox);
+
+      bars.bottom({
+        text: (lensDescriptions?.[L_label]?.text || ""),
+        link: (lensDescriptions?.[L_label]?.url  || ""),
+        logo: logoImg
+      });
+
+      const fname =
+        `IronGlass_Analyze_${safeFileName(L_label)}_${safeFileName(uiFocal)}_T${safeFileName(uiTL)}.pdf`;
+
+      pdf.save(fname);
+      return;
+    }
 
     // ---------- PAGE 1: SPLIT ----------
     pdf.setFillColor(0,0,0);

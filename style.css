@@ -665,6 +665,51 @@ body.sbs-mode #sbsWrapper .pane:last-child{
   border-left:1px solid rgba(255,255,255,.08);
 }
 
+/* =========================================================
+   SINGLE LENS ANALYSIS MODE
+========================================================= */
+body.single-lens-mode .controlsTop .lensRight,
+body.single-lens-mode #toggleButton,
+body.single-lens-mode #sbsToggle{
+  display:none !important;
+}
+
+body.single-lens-mode .controlsTop .lensLeft{
+  flex:0 1 min(620px, 100%);
+}
+
+body.single-lens-mode #beforeImage,
+body.single-lens-mode #slider,
+body.single-lens-mode #sbsWrapper{
+  display:none !important;
+}
+
+body.single-lens-mode #afterWrapper{
+  clip-path:inset(0 0 0 0) !important;
+  -webkit-clip-path:inset(0 0 0 0) !important;
+  z-index:1;
+}
+
+body.single-lens-mode #infoContainer{
+  justify-content:center;
+}
+
+body.single-lens-mode #infoContainer .infoCol:first-child{
+  flex:0 1 auto;
+}
+
+body.single-lens-mode #infoContainer .infoCol:last-child{
+  display:none !important;
+}
+
+body.single-lens-mode #lensInfo{
+  grid-template-columns:1fr;
+}
+
+body.single-lens-mode #rightDetail{
+  display:none !important;
+}
+
 
 
 /* =========================================================
