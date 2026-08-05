@@ -252,26 +252,41 @@ body.sbs-mode .controlsStack.desktop-only{
 }
 
 .customImagesStatus{
-  flex:0 1 240px;
-  min-width:0;
-  max-width:240px;
-  height:36px;
-  padding:0 12px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.10);
-  background:rgba(15,15,15,.48);
-  color:rgba(245,245,245,.62);
-  display:inline-flex;
-  align-items:center;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  font-size:12px;
-  letter-spacing:.02em;
+  display:none;
 }
 
-.customImagesStatus:empty{
-  display:none;
+body.custom-images-mode .camRow > .field,
+body.custom-images-mode #compareSensorToggle,
+body.custom-images-mode #compareSensorWrap,
+body.custom-images-mode .lensCenter,
+body.custom-images-mode #tStopLeftSelect,
+body.custom-images-mode #tStopRightSelect,
+body.custom-images-mode #mfAltLeftWrap,
+body.custom-images-mode #mfAltRightWrap,
+body.custom-images-mode #scaleCtrl,
+body.custom-images-mode #bokehToggle,
+body.custom-images-mode #flareToggle,
+body.custom-images-mode #advancedToggle,
+body.custom-images-mode #advancedPanel{
+  display:none !important;
+}
+
+body.custom-images-mode .compareSensorGroup{
+  margin-left:0;
+}
+
+body.custom-images-mode #leftLens:disabled,
+body.custom-images-mode #rightLens:disabled{
+  opacity:1;
+  cursor:default;
+  filter:none;
+}
+
+body.custom-images-mode #beforeImgTag,
+body.custom-images-mode #afterImgTag,
+body.custom-images-mode #sbsLeftImg,
+body.custom-images-mode #sbsRightImg{
+  object-fit:contain !important;
 }
 
 /* advanced panel */

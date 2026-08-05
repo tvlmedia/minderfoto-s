@@ -421,6 +421,24 @@ const customImages = {
   right: null
 };
 
+function getCustomImageWH(side){
+  const img = customImages?.[side];
+  if(!img?.width || !img?.height) return null;
+  return { w: img.width, h: img.height };
+}
+
+function getCustomDisplayWH(){
+  const left = getCustomImageWH("left");
+  const right = getCustomImageWH("right");
+
+  if(sbsActive && left && right){
+    const ar = (left.w / left.h) + (right.w / right.h);
+    return { w: ar * 1000, h: 1000, label: "Custom stills" };
+  }
+
+  return left || right || BASE_SENSOR;
+}
+
 function escapeHTML(value){
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -459,15 +477,6 @@ function revokeCustomImage(side){
   customImages[side] = null;
 }
 
-function setCustomImageForSide(side, file){
-  if(!customImages || !file) return;
-  revokeCustomImage(side);
-  customImages[side] = {
-    url: URL.createObjectURL(file),
-    name: file.name || (side === "left" ? "Left custom still" : "Right custom still")
-  };
-}
-
 function swapCustomImages(){
   const left = customImages.left;
   customImages.left = customImages.right;
@@ -480,8 +489,50 @@ function customSideLabel(side){
   return shortenFileName(customImages?.[side]?.name || fallback, 34);
 }
 
+function customSideSelectLabel(side){
+  const fallback = side === "left" ? "Left custom still" : "Right custom still";
+  return shortenFileName(customImages?.[side]?.name || fallback, 56);
+}
+
+function setSelectedOptionLabel(sel, label){
+  if(!sel || !label) return;
+  const opt = sel.options?.[sel.selectedIndex];
+  if(!opt) return;
+  if(!opt.dataset.presetLabel) opt.dataset.presetLabel = opt.textContent || opt.value;
+  opt.textContent = label;
+  opt.label = label;
+  sel.title = label;
+}
+
+function restoreSelectOptionLabels(sel){
+  if(!sel) return;
+  Array.from(sel.options).forEach(opt => {
+    const label = opt.dataset.presetLabel || opt.value;
+    opt.textContent = label;
+    opt.label = label;
+  });
+  sel.removeAttribute("title");
+}
+
+function syncCustomLensSelectLabels(){
+  restoreSelectOptionLabels(leftSelect);
+  restoreSelectOptionLabels(rightSelect);
+
+  if(hasCustomSide("left")){
+    setSelectedOptionLabel(leftSelect, customSideSelectLabel("left"));
+  }
+
+  if(hasCustomSide("right")){
+    setSelectedOptionLabel(rightSelect, customSideSelectLabel("right"));
+  }
+
+  if(leftSelect) leftSelect.disabled = hasCustomSide("left");
+  if(rightSelect) rightSelect.disabled = hasCustomSide("right");
+}
+
 function syncCustomImagesUI(){
   const hasCustom = hasAnyCustomImages();
+  document.body.classList.toggle("custom-images-mode", hasCustom);
 
   if(customImagesButton){
     customImagesButton.textContent = hasCustom ? "Custom Images: ON" : "Custom Images";
@@ -493,11 +544,21 @@ function syncCustomImagesUI(){
   }
 
   if(customImagesStatus){
-    const left = hasCustomSide("left") ? customSideLabel("left") : "";
-    const right = hasCustomSide("right") ? customSideLabel("right") : "";
-    customImagesStatus.textContent = left && right ? `${left} vs ${right}` : (left || right);
-    customImagesStatus.title = customImagesStatus.textContent;
+    customImagesStatus.textContent = "";
+    customImagesStatus.removeAttribute("title");
   }
+
+  if(hasCustom && compareSensorActive){
+    compareSensorActive = false;
+    compareSensorToggle?.classList.remove("active");
+    compareSensorToggle?.setAttribute("aria-pressed", "false");
+    compareSensorWrap && (compareSensorWrap.style.display = "none");
+    document.body.classList.remove("compare-sensor-on");
+  }
+
+  syncCustomLensSelectLabels();
+  setFullscreenImageFit(isWrapperFullscreen());
+  updateCompareOutline();
 }
 
 function clearCustomImages({ refresh = true } = {}){
@@ -506,12 +567,54 @@ function clearCustomImages({ refresh = true } = {}){
   syncCustomImagesUI();
 
   if(refresh){
+    applyCurrentFormat();
     updateLensInfo();
     updateImages();
   }
 }
 
-function applyCustomImageFiles(files){
+function loadCustomImageMeta(url){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve({
+      width: img.naturalWidth || img.width || BASE_SENSOR.w,
+      height: img.naturalHeight || img.height || BASE_SENSOR.h
+    });
+    img.onerror = () => resolve({ width: BASE_SENSOR.w, height: BASE_SENSOR.h });
+    img.src = url;
+  });
+}
+
+async function setCustomImageForSide(side, file){
+  if(!customImages || !file) return;
+  const url = URL.createObjectURL(file);
+  const meta = await loadCustomImageMeta(url);
+
+  revokeCustomImage(side);
+  customImages[side] = {
+    url,
+    name: file.name || (side === "left" ? "Left custom still" : "Right custom still"),
+    width: meta.width,
+    height: meta.height
+  };
+}
+
+function applyCustomStillLayout(){
+  if(!hasAnyCustomImages()) return;
+  const { w, h } = getCurrentWH();
+  comparisonWrapper.style.removeProperty("--sensor-scale");
+  comparisonWrapper.style.setProperty("--sensor-scale", "1");
+  setWrapperSizeByAR(w, h);
+  requestAnimationFrame(() => {
+    setWrapperSizeByAR(w, h);
+    updateFullscreenBars();
+    resetSplitToMiddle();
+    applyCalibrationTransforms();
+    updateCompareOutline();
+  });
+}
+
+async function applyCustomImageFiles(files){
   const valid = Array.from(files || []).filter(isSupportedCustomImage);
 
   if(!valid.length){
@@ -520,17 +623,19 @@ function applyCustomImageFiles(files){
   }
 
   if(valid[1]){
-    setCustomImageForSide("left", valid[0]);
-    setCustomImageForSide("right", valid[1]);
+    await setCustomImageForSide("left", valid[0]);
+    await setCustomImageForSide("right", valid[1]);
     setComparisonMode(true);
   } else if(hasCustomSide("left") && !hasCustomSide("right")){
-    setCustomImageForSide("right", valid[0]);
+    await setCustomImageForSide("right", valid[0]);
     setComparisonMode(true);
   } else {
-    setCustomImageForSide("left", valid[0]);
+    await setCustomImageForSide("left", valid[0]);
   }
 
+  resetUserScale();
   syncCustomImagesUI();
+  applyCustomStillLayout();
   updateLensInfo();
   updateImages();
 }
@@ -542,8 +647,8 @@ customImagesButton?.addEventListener("click", () => {
   customImagesButton.blur();
 });
 
-customImagesInput?.addEventListener("change", () => {
-  applyCustomImageFiles(customImagesInput.files);
+customImagesInput?.addEventListener("change", async () => {
+  await applyCustomImageFiles(customImagesInput.files);
   customImagesInput.value = "";
 });
 
@@ -624,7 +729,7 @@ function updateCompareOutline(){
   if(!compareOutline) return;
 
   // verberg in SBS of als uit staat
-  if(!compareSensorActive || sbsActive){
+  if(!compareSensorActive || sbsActive || hasAnyCustomImages()){
     compareOutline.style.display = "none";
     if(compareSensorLabelEl){
       compareSensorLabelEl.textContent = "";
@@ -983,15 +1088,27 @@ let sbsActive=false, isExportingPdf=false, userScale=1;
 const isWrapperFullscreen=()=> (document.fullscreenElement||document.webkitFullscreenElement)===comparisonWrapper;
 const enterWrapperFullscreen=()=> comparisonWrapper.requestFullscreen?.()||comparisonWrapper.webkitRequestFullscreen?.();
 const exitAnyFullscreen=()=> document.exitFullscreen?.()||document.webkitExitFullscreen?.();
-function setWrapperSizeByAR(w,h){ if(isWrapperFullscreen())return; const width=comparisonWrapper.getBoundingClientRect().width, arWidth=sbsActive?(w*2):w, height=Math.round(width*(h/arWidth)); ["height","min-height","max-height"].forEach(p=>comparisonWrapper.style.setProperty(p,`${height}px`,"important")); comparisonWrapper.style.removeProperty("aspect-ratio"); }
+function setWrapperSizeByAR(w,h){
+  if(isWrapperFullscreen()) return;
+  const width = comparisonWrapper.getBoundingClientRect().width;
+  const arWidth = (sbsActive && !hasAnyCustomImages()) ? (w * 2) : w;
+  const height = Math.round(width * (h / arWidth));
+  ["height","min-height","max-height"].forEach(p => comparisonWrapper.style.setProperty(p, `${height}px`, "important"));
+  comparisonWrapper.style.removeProperty("aspect-ratio");
+}
 function clearInlineHeights(){ ["height","min-height","max-height"].forEach(p=>comparisonWrapper.style.removeProperty(p)); }
 function getCurrentWH(){
+  if(hasAnyCustomImages()) return getCustomDisplayWH();
+
   const cam = cameraSelect.value;
   const fmt = sensorFormatSelect.value;
   const hit = cam && fmt && cameras?.[cam]?.[fmt];
   return hit || BASE_SENSOR;
 }
-function getTargetAR(){ const {w,h}=getCurrentWH(); return sbsActive?(2*w)/h:w/h; }
+function getTargetAR(){
+  const { w, h } = getCurrentWH();
+  return (sbsActive && !hasAnyCustomImages()) ? (2 * w) / h : w / h;
+}
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
 
 function beginFsEnterMask(){
@@ -1135,6 +1252,11 @@ cameraSelect.addEventListener("change",()=>{ sensorFormatSelect.innerHTML=""; co
 sensorFormatSelect.addEventListener("change", applyCurrentFormat);
 
 function applyCurrentFormat(){
+  if(hasAnyCustomImages()){
+    applyCustomStillLayout();
+    return;
+  }
+
   const { w, h } = getCurrentWH();
 
   comparisonWrapper.style.removeProperty("--sensor-scale");
@@ -1287,6 +1409,7 @@ function updateLensOptionsForCurrentFocal(){
 
   // en dan T-stops weer syncen met de (mogelijk) nieuwe lenskeuze
   updateTStopDropdowns();
+  syncCustomImagesUI();
 
   updateLensInfo();
   updateImages();
@@ -1486,10 +1609,9 @@ function enableCalibrate(){
   calibrateBtn.click();        // gebruikt jouw bestaande toggle-logica
 }
 
-// --- Fullscreen: voorkom crop (force object-fit: contain) ---
+// --- Image fit: presets keep calibration/crop; custom uploads stay uncropped ---
 function setFullscreenImageFit(isFs){
-  // ✅ Laat calibration consistent: cover blijft altijd dezelfde mapping geven
-  const fit = "cover";
+  const fit = hasAnyCustomImages() ? "contain" : "cover";
   const pos = "center center";
 
   [beforeImgTag, afterImgTag, sbsLeftImg, sbsRightImg].forEach(img => {
@@ -1636,6 +1758,15 @@ function getCal(lensSlug, focal){
     
   function autoScaleForCalibration(){
 
+  // Custom uploads blijven ongecropt en zonder lens-calibratie.
+  if(hasAnyCustomImages()){
+    calibrateAutoScaled = false;
+    if(scaleSlider) scaleSlider.value = "100";
+    setUserScaleFromPct(100);
+    applyCalibrationTransforms();
+    return;
+  }
+
   // ✅ Alleen autoscale op de whitelist (GFX + specifieke modes)
   if(!shouldAutoScaleForCalibration()){
     // Als we eerder wél autoscaled hadden (bijv. je kwam van GFX), zet dan netjes terug
@@ -1708,6 +1839,13 @@ function setCalVars(img, dx=0, dy=0, sc=1){
 }
 
 function applyCalibrationTransforms(){
+  if(hasAnyCustomImages()){
+    [afterImgTag, beforeImgTag, sbsLeftImg, sbsRightImg].forEach(img => {
+      if(img) setCalVars(img, 0, 0, 1);
+    });
+    return;
+  }
+
   const uiFocal = focalLengthSelect?.value || "35mm";
 
   const leftSlug  = lensSlugFromLabel(leftSelect?.value || "");
@@ -1888,6 +2026,7 @@ const tRFallback = String((TSTOP_FILE_ALIAS?.[RR]?.[uiTR] ?? uiTR)).replace(/\./
 
  const leftIsCustom = hasCustomSide("left");
  const rightIsCustom = hasCustomSide("right");
+ setFullscreenImageFit(isWrapperFullscreen());
 
  let leftCandidates = leftIsCustom
   ? [customImages.left.url]
@@ -2164,6 +2303,10 @@ toggleBtn?.addEventListener("click",()=>{
 
 
 function recalcLayout(){
+  if(hasAnyCustomImages()){
+    const { w, h } = getCurrentWH();
+    setWrapperSizeByAR(w, h);
+  }
   updateFullscreenBars();
   resetSplitToMiddle();
   if(calibrateActive) autoScaleForCalibration();
@@ -3017,11 +3160,15 @@ function getHtml2CanvasFn(){
 }
 /* === PDF export (4 pagina’s) === */
 function loadHTMLImage(src){ return new Promise((res,rej)=>{ const im=new Image(); im.crossOrigin="anonymous"; im.onload=()=>res(im); im.onerror=rej; im.src=src; }); }
-async function renderToSensorAR(imgOrURL, targetAR, outH, scale=1, yFrac=0){
+async function renderToSensorAR(imgOrURL, targetAR, outH, scale=1, yFrac=0, fit="cover"){
   const img=typeof imgOrURL==="string"?await loadHTMLImage(imgOrURL):imgOrURL, H=outH, W=Math.round(H*targetAR);
   const cvs=document.createElement("canvas"); cvs.width=W; cvs.height=H; const ctx=cvs.getContext("2d",{alpha:false}); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,W,H);
   const srcAR=(img.naturalWidth||img.width)/(img.naturalHeight||img.height); let dW,dH,ox,oy;
-  if(srcAR<targetAR){ dW=W; dH=W/srcAR; ox=0; oy=(H-dH)/2; } else { dH=H; dW=H*srcAR; oy=0; ox=(W-dW)/2; }
+  if(fit === "contain"){
+    if(srcAR>targetAR){ dW=W; dH=W/srcAR; ox=0; oy=(H-dH)/2; } else { dH=H; dW=H*srcAR; oy=0; ox=(W-dW)/2; }
+  } else if(srcAR<targetAR){ dW=W; dH=W/srcAR; ox=0; oy=(H-dH)/2; } else { dH=H; dW=H*srcAR; oy=0; ox=(W-dW)/2; }
    if(scale!==1){ const oW=dW,oH=dH; dW=oW*scale; dH=oH*scale; ox-=(dW-oW)/2; oy-=(dH-oH)/2; }
 
   if(yFrac){
@@ -3186,6 +3333,16 @@ function safeFileName(s){
     .replace(/[^a-z0-9_\-]/gi, "");
 }
 
+function getPdfFrameAR(){
+  if(hasAnyCustomImages()){
+    const wh = getCustomImageWH("left") || getCustomImageWH("right") || BASE_SENSOR;
+    return wh.w / wh.h;
+  }
+
+  const { w, h } = getCurrentWH();
+  return w / h;
+}
+
 async function exportLensPdf(){
   if(isExportingPdf) return;
 
@@ -3270,8 +3427,9 @@ async function exportLensPdf(){
     }
 
     // Sensor AR (single frame)
-    const { w, h } = getCurrentWH();
-    const sensorAR = w / h;
+    const sensorAR = getPdfFrameAR();
+    const leftPdfFit = L_isCustom ? "contain" : "cover";
+    const rightPdfFit = R_isCustom ? "contain" : "cover";
 
     // Bars helper (uses your drawBars)
     const bars = drawBars(pdf, TOP_BAR, BOTTOM_BAR, PAGE_MARGIN);
@@ -3283,7 +3441,7 @@ async function exportLensPdf(){
       bars.top(L_pdfTitle);
 
       const singleOutH = 2200;
-      const singleRender = await renderToSensorAR(leftURL, sensorAR, singleOutH, 1, 0);
+      const singleRender = await renderToSensorAR(leftURL, sensorAR, singleOutH, 1, 0, leftPdfFit);
       await placeContain(pdf, singleRender.dataURL, imgBox);
 
       bars.bottom({
@@ -3310,8 +3468,8 @@ async function exportLensPdf(){
 
     // Build split at current slider position (or 50/50 if SBS)
     const splitOutH = 2200; // quality vs file size
-    const renderedL = await renderToSensorAR(leftURL,  sensorAR, splitOutH, 1, 0);
-    const renderedR = await renderToSensorAR(rightURL, sensorAR, splitOutH, 1, 0);
+    const renderedL = await renderToSensorAR(leftURL,  sensorAR, splitOutH, 1, 0, leftPdfFit);
+    const renderedR = await renderToSensorAR(rightURL, sensorAR, splitOutH, 1, 0, rightPdfFit);
 
     const splitData = await buildSplitFromSensor(renderedL.dataURL, renderedR.dataURL, renderedL.W, renderedL.H);
 
@@ -3329,7 +3487,7 @@ async function exportLensPdf(){
     bars.top(L_pdfTitle);
 
     const leftOutH = 2200;
-    const leftRender = await renderToSensorAR(leftURL, sensorAR, leftOutH, 1, 0);
+    const leftRender = await renderToSensorAR(leftURL, sensorAR, leftOutH, 1, 0, leftPdfFit);
     await placeContain(pdf, leftRender.dataURL, imgBox);
 
     bars.bottom({
@@ -3346,7 +3504,7 @@ async function exportLensPdf(){
     bars.top(R_pdfTitle);
 
     const rightOutH = 2200;
-    const rightRender = await renderToSensorAR(rightURL, sensorAR, rightOutH, 1, 0);
+    const rightRender = await renderToSensorAR(rightURL, sensorAR, rightOutH, 1, 0, rightPdfFit);
     await placeContain(pdf, rightRender.dataURL, imgBox);
 
     bars.bottom({
