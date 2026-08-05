@@ -140,6 +140,17 @@
 
          <div class="row actionRow">
 	 <div class="actionLeft">
+	  <button id="customImagesButton" class="control-button" type="button" title="Upload two stills at once, or click twice to fill left and right">Custom Images</button>
+	  <input
+	    id="customImagesInput"
+	    class="customImagesInput"
+	    type="file"
+	    accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+	    multiple
+	    aria-label="Upload custom stills"
+	  />
+	  <button id="clearCustomImagesButton" class="control-button" type="button" hidden>Preset Stills</button>
+	  <span id="customImagesStatus" class="customImagesStatus" aria-live="polite"></span>
 	  <button id="toggleButton" class="control-button" type="button">↔ Flip</button>
 	  <button id="sbsToggle" class="control-button" type="button">Side-by-Side (S)</button>
 	  <button id="fullscreenButton" class="control-button" type="button">⛶ Fullscreen (P)</button>

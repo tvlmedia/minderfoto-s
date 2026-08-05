@@ -243,6 +243,37 @@ body.sbs-mode .controlsStack.desktop-only{
 }
 .controlsBottom .actionLeft::-webkit-scrollbar{ display:none; }
 
+.customImagesInput{
+  display:none;
+}
+
+#clearCustomImagesButton[hidden]{
+  display:none !important;
+}
+
+.customImagesStatus{
+  flex:0 1 240px;
+  min-width:0;
+  max-width:240px;
+  height:36px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(15,15,15,.48);
+  color:rgba(245,245,245,.62);
+  display:inline-flex;
+  align-items:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:12px;
+  letter-spacing:.02em;
+}
+
+.customImagesStatus:empty{
+  display:none;
+}
+
 /* advanced panel */
 #advancedPanel.advancedPanel{
   display:none;

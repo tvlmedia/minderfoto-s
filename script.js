@@ -400,6 +400,10 @@ const flareToggle=q("flareToggle"), scaleSlider=q("scaleSlider"), scaleVal=q("sc
 const bokehToggle = q("bokehToggle");
 const reframeBtn = q("reframeToggle");
 const calibrateBtn = q("calibrateToggle");
+const customImagesButton = q("customImagesButton");
+const customImagesInput = q("customImagesInput");
+const clearCustomImagesButton = q("clearCustomImagesButton");
+const customImagesStatus = q("customImagesStatus");
 let calibrateActive = false;
 let calibrateUserTouchedScale = false;
 const exposureBtn = q("exposureToggle");
@@ -411,6 +415,146 @@ const downloadPdfButton = q("downloadPdfButton"); // ✅ HIER
 const detailOverlay=q("detailOverlay"), leftDetail=q("leftDetail"), rightDetail=q("rightDetail"), detailToggleButton=q("detailViewToggle");
 
 let comparisonActive = true;
+
+const customImages = {
+  left: null,
+  right: null
+};
+
+function escapeHTML(value){
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function shortenFileName(name, max = 26){
+  const clean = String(name || "Custom still").trim() || "Custom still";
+  if(clean.length <= max) return clean;
+  const extMatch = clean.match(/(\.[a-z0-9]{2,5})$/i);
+  const ext = extMatch ? extMatch[1] : "";
+  const base = ext ? clean.slice(0, -ext.length) : clean;
+  return `${base.slice(0, Math.max(8, max - ext.length - 3))}...${ext}`;
+}
+
+function isSupportedCustomImage(file){
+  if(!file) return false;
+  if(file.type && /^image\/(png|jpe?g|webp|avif|gif)$/i.test(file.type)) return true;
+  return /\.(png|jpe?g|webp|avif|gif)$/i.test(file.name || "");
+}
+
+function hasCustomSide(side){
+  return !!customImages?.[side]?.url;
+}
+
+function hasAnyCustomImages(){
+  return hasCustomSide("left") || hasCustomSide("right");
+}
+
+function revokeCustomImage(side){
+  const current = customImages?.[side];
+  if(current?.url) URL.revokeObjectURL(current.url);
+  customImages[side] = null;
+}
+
+function setCustomImageForSide(side, file){
+  if(!customImages || !file) return;
+  revokeCustomImage(side);
+  customImages[side] = {
+    url: URL.createObjectURL(file),
+    name: file.name || (side === "left" ? "Left custom still" : "Right custom still")
+  };
+}
+
+function swapCustomImages(){
+  const left = customImages.left;
+  customImages.left = customImages.right;
+  customImages.right = left;
+  syncCustomImagesUI();
+}
+
+function customSideLabel(side){
+  const fallback = side === "left" ? "Left custom still" : "Right custom still";
+  return shortenFileName(customImages?.[side]?.name || fallback, 34);
+}
+
+function syncCustomImagesUI(){
+  const hasCustom = hasAnyCustomImages();
+
+  if(customImagesButton){
+    customImagesButton.textContent = hasCustom ? "Custom Images: ON" : "Custom Images";
+    setToggleActive(customImagesButton, hasCustom);
+  }
+
+  if(clearCustomImagesButton){
+    clearCustomImagesButton.hidden = !hasCustom;
+  }
+
+  if(customImagesStatus){
+    const left = hasCustomSide("left") ? customSideLabel("left") : "";
+    const right = hasCustomSide("right") ? customSideLabel("right") : "";
+    customImagesStatus.textContent = left && right ? `${left} vs ${right}` : (left || right);
+    customImagesStatus.title = customImagesStatus.textContent;
+  }
+}
+
+function clearCustomImages({ refresh = true } = {}){
+  revokeCustomImage("left");
+  revokeCustomImage("right");
+  syncCustomImagesUI();
+
+  if(refresh){
+    updateLensInfo();
+    updateImages();
+  }
+}
+
+function applyCustomImageFiles(files){
+  const valid = Array.from(files || []).filter(isSupportedCustomImage);
+
+  if(!valid.length){
+    alert("Please upload JPG, PNG, WebP, AVIF, or GIF stills.");
+    return;
+  }
+
+  if(valid[1]){
+    setCustomImageForSide("left", valid[0]);
+    setCustomImageForSide("right", valid[1]);
+    setComparisonMode(true);
+  } else if(hasCustomSide("left") && !hasCustomSide("right")){
+    setCustomImageForSide("right", valid[0]);
+    setComparisonMode(true);
+  } else {
+    setCustomImageForSide("left", valid[0]);
+  }
+
+  syncCustomImagesUI();
+  updateLensInfo();
+  updateImages();
+}
+
+customImagesButton?.addEventListener("click", () => {
+  if(!customImagesInput) return;
+  customImagesInput.value = "";
+  customImagesInput.click();
+  customImagesButton.blur();
+});
+
+customImagesInput?.addEventListener("change", () => {
+  applyCustomImageFiles(customImagesInput.files);
+  customImagesInput.value = "";
+});
+
+clearCustomImagesButton?.addEventListener("click", () => {
+  clearCustomImages();
+  clearCustomImagesButton.blur();
+});
+
+window.addEventListener("beforeunload", () => {
+  clearCustomImages({ refresh: false });
+});
 
 
 
@@ -1417,6 +1561,7 @@ function updateToggleHighlights(){
   setToggleActive(detailToggleButton, isDetailOn);
   setToggleActive(calibrateBtn, !!calibrateActive);
   setToggleActive(exposureBtn, !!exposureCorrectionActive);
+  setToggleActive(customImagesButton, hasAnyCustomImages());
 }
 
 
@@ -1450,13 +1595,19 @@ function setDownloadButton(btn,key){
 function updateLensInfo(){
   const L = leftSelect.value;
   const R = rightSelect.value;
+  const leftInfo = hasCustomSide("left")
+    ? `<p><strong>Custom still:</strong> ${escapeHTML(customSideLabel("left"))}</p>`
+    : `<p><strong>${L}:</strong> ${lensDescriptions[L]?.text || ""}</p>`;
+  const rightInfo = hasCustomSide("right")
+    ? `<p><strong>Custom still:</strong> ${escapeHTML(customSideLabel("right"))}</p>`
+    : `<p><strong>${R}:</strong> ${lensDescriptions[R]?.text || ""}</p>`;
 
   if(!comparisonActive){
-    lensInfoDiv.innerHTML = `<p><strong>${L}:</strong> ${lensDescriptions[L]?.text || ""}</p>`;
+    lensInfoDiv.innerHTML = leftInfo;
     return;
   }
 
-  lensInfoDiv.innerHTML = `<p><strong>${L}:</strong> ${lensDescriptions[L]?.text || ""}</p><p><strong>${R}:</strong> ${lensDescriptions[R]?.text || ""}</p>`;
+  lensInfoDiv.innerHTML = leftInfo + rightInfo;
 }
 
 /* === Calibrate Function === */
@@ -1509,8 +1660,8 @@ const rightSlug = lensSlugFromLabel(rightSelect?.value || "");
 const leftFocal  = getEffectiveFocal(leftSlug,  uiFocal, "left");
 const rightFocal = getEffectiveFocal(rightSlug, uiFocal, "right");
 
-const leftCal  = getCal(leftSlug,  leftFocal);
-const rightCal = getCal(rightSlug, rightFocal);
+const leftCal  = hasCustomSide("left") ? null : getCal(leftSlug,  leftFocal);
+const rightCal = hasCustomSide("right") ? null : getCal(rightSlug, rightFocal);
 
     
   updateFullscreenBars();
@@ -1532,8 +1683,8 @@ const rightCal = getCal(rightSlug, rightFocal);
     const leftImg  = sbsActive ? sbsLeftImg  : afterImgTag;   // after = links
   const rightImg = sbsActive ? sbsRightImg : beforeImgTag;  // before = rechts
 
-  let required = Math.max(1, requiredScaleFor(leftImg, leftCal));
-  if(comparisonActive){
+  let required = hasCustomSide("left") ? 1 : Math.max(1, requiredScaleFor(leftImg, leftCal));
+  if(comparisonActive && !hasCustomSide("right")){
     required = Math.max(required, requiredScaleFor(rightImg, rightCal));
   }
 
@@ -1565,12 +1716,19 @@ function applyCalibrationTransforms(){
   const leftFocal  = getEffectiveFocal(leftSlug,  uiFocal, "left");
   const rightFocal = getEffectiveFocal(rightSlug, uiFocal, "right");
 
-  const leftCal  = getCal(leftSlug,  leftFocal);
-  const rightCal = getCal(rightSlug, rightFocal);
+  const leftIsCustom = hasCustomSide("left");
+  const rightIsCustom = hasCustomSide("right");
+  const leftCal  = leftIsCustom ? null : getCal(leftSlug,  leftFocal);
+  const rightCal = rightIsCustom ? null : getCal(rightSlug, rightFocal);
 
   // ✅ helper die je miste
- const apply = (img, cal, effectiveFocal) => {
+ const apply = (img, cal, effectiveFocal, isCustom = false) => {
   if(!img) return;
+
+  if(isCustom){
+    setCalVars(img, 0, 0, 1);
+    return;
+  }
 
   // 1) basis: geen calibratie
   let dx = 0, dy = 0, sc = 1;
@@ -1592,15 +1750,16 @@ function applyCalibrationTransforms(){
 };
 
   // after = links, before = rechts
-  apply(afterImgTag,  leftCal,  leftFocal);
-apply(beforeImgTag, rightCal, rightFocal);
+  apply(afterImgTag,  leftCal,  leftFocal, leftIsCustom);
+apply(beforeImgTag, rightCal, rightFocal, rightIsCustom);
   // SBS ook
-  apply(sbsLeftImg,  leftCal,  leftFocal);
-apply(sbsRightImg, rightCal, rightFocal);
+  apply(sbsLeftImg,  leftCal,  leftFocal, leftIsCustom);
+apply(sbsRightImg, rightCal, rightFocal, rightIsCustom);
 }
 /* === Image resolver === */
 function aliasFor(lens, nominal){ return notes[`${lens}_${nominal}`] || nominal; }
 function setImageWithFallback(imgEl, urls){
+  if(!imgEl || !urls || !urls.length) return;
   let i = 0;
 
   // reset eventuele vorige error handler (we overschrijven bewust)
@@ -1727,12 +1886,23 @@ const RR = lensSlugFromLabel(rightSelect.value);
  const tLFallback = String((TSTOP_FILE_ALIAS?.[LL]?.[uiTL] ?? uiTL)).replace(/\./g, "_");
 const tRFallback = String((TSTOP_FILE_ALIAS?.[RR]?.[uiTR] ?? uiTR)).replace(/\./g, "_");
 
- let leftCandidates  = resolveImageCandidates(LL, leftFocal,  tL, flareMode, sceneMode, tLFallback);
-let rightCandidates = resolveImageCandidates(RR, rightFocal, tR, flareMode, sceneMode, tRFallback);
+ const leftIsCustom = hasCustomSide("left");
+ const rightIsCustom = hasCustomSide("right");
+
+ let leftCandidates = leftIsCustom
+  ? [customImages.left.url]
+  : resolveImageCandidates(LL, leftFocal,  tL, flareMode, sceneMode, tLFallback);
+let rightCandidates = rightIsCustom
+  ? [customImages.right.url]
+  : resolveImageCandidates(RR, rightFocal, tR, flareMode, sceneMode, tRFallback);
 
 if(exposureCorrectionActive){
+  if(!leftIsCustom){
   leftCandidates  = preferCorrectedUrls(leftCandidates);
+  }
+  if(!rightIsCustom){
   rightCandidates = preferCorrectedUrls(rightCandidates);
+  }
 }
 
   // jouw tool: before = rechts, after = links
@@ -1755,14 +1925,23 @@ const uiTRLabel = `T${uiTR}`;
   const lfDisplay = String(lf).replace(/_m(35|50)$/, "");
   const rfDisplay = String(rf).replace(/_m(35|50)$/, "");
 
-  leftLabel.innerHTML  = `Lens: <a href="${lu}" target="_blank" rel="noopener noreferrer">${leftSelect.value} ${lfDisplay} ${uiTLLabel}${tLNote}</a>`;
-  rightLabel.innerHTML = comparisonActive
-    ? `Lens: <a href="${ru}" target="_blank" rel="noopener noreferrer">${rightSelect.value} ${rfDisplay} ${uiTRLabel}${tRNote}</a>`
-    : "";
+  if(leftIsCustom){
+    leftLabel.textContent = `Custom still: ${customSideLabel("left")}`;
+  } else {
+    leftLabel.innerHTML = `Lens: <a href="${lu}" target="_blank" rel="noopener noreferrer">${leftSelect.value} ${lfDisplay} ${uiTLLabel}${tLNote}</a>`;
+  }
+
+  if(!comparisonActive){
+    rightLabel.textContent = "";
+  } else if(rightIsCustom){
+    rightLabel.textContent = `Custom still: ${customSideLabel("right")}`;
+  } else {
+    rightLabel.innerHTML = `Lens: <a href="${ru}" target="_blank" rel="noopener noreferrer">${rightSelect.value} ${rfDisplay} ${uiTRLabel}${tRNote}</a>`;
+  }
 
   // ✅ RAW download keys moeten matchen met je “file focal” (aliasFor) + file t-stop
-  setDownloadButton(downloadLeftRawButton,  `${LL}_${lf}_t${tL}`);
-  if(comparisonActive) setDownloadButton(downloadRightRawButton, `${RR}_${rf}_t${tR}`);
+  setDownloadButton(downloadLeftRawButton, leftIsCustom ? "" : `${LL}_${lf}_t${tL}`);
+  if(comparisonActive) setDownloadButton(downloadRightRawButton, rightIsCustom ? "" : `${RR}_${rf}_t${tR}`);
   else setDownloadButton(downloadRightRawButton, "");
 
   // SBS ook updaten
@@ -1968,6 +2147,7 @@ toggleBtn?.addEventListener("click",()=>{
 
   const l=leftSelect.value; leftSelect.value=rightSelect.value; rightSelect.value=l; 
   const t=tStopLeftSelect.value; tStopLeftSelect.value=tStopRightSelect.value; tStopRightSelect.value=t; 
+  swapCustomImages();
 
   updateMfAltUI();
 
@@ -3056,6 +3236,8 @@ async function exportLensPdf(){
     const uiFocal = focalLengthSelect?.value || "50mm";
     const L_label = leftSelect?.value || "";
     const R_label = rightSelect?.value || "";
+    const L_isCustom = hasCustomSide("left");
+    const R_isCustom = hasCustomSide("right");
 
     const L_slug = lensSlugFromLabel(L_label);
     const R_slug = lensSlugFromLabel(R_label);
@@ -3069,6 +3251,14 @@ async function exportLensPdf(){
     // Visible focal label (uses your alias mapping, shows e.g. 58MM for “50mm” on MKII/RedP)
     const focalShownLeft  = displayFocalForUI(L_slug, uiFocal);
     const focalShownRight = displayFocalForUI(R_slug, uiFocal);
+    const L_pdfName = L_isCustom ? customSideLabel("left") : L_label;
+    const R_pdfName = R_isCustom ? customSideLabel("right") : R_label;
+    const L_pdfTitle = L_isCustom ? `Custom still - ${L_pdfName}` : `${L_label} - ${focalShownLeft} - T${uiTL}`;
+    const R_pdfTitle = R_isCustom ? `Custom still - ${R_pdfName}` : `${R_label} - ${focalShownRight} - T${uiTR}`;
+    const L_pdfText = L_isCustom ? "Custom still uploaded by the user." : (lensDescriptions?.[L_label]?.text || "");
+    const R_pdfText = R_isCustom ? "Custom still uploaded by the user." : (lensDescriptions?.[R_label]?.text || "");
+    const L_pdfLink = L_isCustom ? "" : (lensDescriptions?.[L_label]?.url || "");
+    const R_pdfLink = R_isCustom ? "" : (lensDescriptions?.[R_label]?.url || "");
 
     // Sources: take what viewer currently shows (includes flare/bokeh/exposure corrected variant)
     const leftURL  = afterImgTag?.src;   // left = after
@@ -3090,21 +3280,22 @@ async function exportLensPdf(){
       pdf.setFillColor(0,0,0);
       pdf.rect(0,0,pw,ph,"F");
 
-      const titleSingle = `${L_label} — ${focalShownLeft} — T${uiTL}`;
-      bars.top(titleSingle);
+      bars.top(L_pdfTitle);
 
       const singleOutH = 2200;
       const singleRender = await renderToSensorAR(leftURL, sensorAR, singleOutH, 1, 0);
       await placeContain(pdf, singleRender.dataURL, imgBox);
 
       bars.bottom({
-        text: (lensDescriptions?.[L_label]?.text || ""),
-        link: (lensDescriptions?.[L_label]?.url  || ""),
+        text: L_pdfText,
+        link: L_pdfLink,
         logo: logoImg
       });
 
       const fname =
-        `IronGlass_Analyze_${safeFileName(L_label)}_${safeFileName(uiFocal)}_T${safeFileName(uiTL)}.pdf`;
+        L_isCustom
+          ? `IronGlass_Custom_${safeFileName(L_pdfName)}.pdf`
+          : `IronGlass_Analyze_${safeFileName(L_label)}_${safeFileName(uiFocal)}_T${safeFileName(uiTL)}.pdf`;
 
       pdf.save(fname);
       return;
@@ -3114,7 +3305,7 @@ async function exportLensPdf(){
     pdf.setFillColor(0,0,0);
     pdf.rect(0,0,pw,ph,"F");
 
-    const titleP1 = `${L_label} vs ${R_label} — ${focalShownLeft} / ${focalShownRight}`;
+    const titleP1 = `${L_pdfName} vs ${R_pdfName}`;
     bars.top(titleP1);
 
     // Build split at current slider position (or 50/50 if SBS)
@@ -3135,16 +3326,15 @@ async function exportLensPdf(){
     pdf.setFillColor(0,0,0);
     pdf.rect(0,0,pw,ph,"F");
 
-    const titleL = `${L_label} — ${focalShownLeft} — T${uiTL}`;
-    bars.top(titleL);
+    bars.top(L_pdfTitle);
 
     const leftOutH = 2200;
     const leftRender = await renderToSensorAR(leftURL, sensorAR, leftOutH, 1, 0);
     await placeContain(pdf, leftRender.dataURL, imgBox);
 
     bars.bottom({
-      text: (lensDescriptions?.[L_label]?.text || ""),
-      link: (lensDescriptions?.[L_label]?.url  || ""),
+      text: L_pdfText,
+      link: L_pdfLink,
       logo: logoImg
     });
 
@@ -3153,22 +3343,23 @@ async function exportLensPdf(){
     pdf.setFillColor(0,0,0);
     pdf.rect(0,0,pw,ph,"F");
 
-    const titleR = `${R_label} — ${focalShownRight} — T${uiTR}`;
-    bars.top(titleR);
+    bars.top(R_pdfTitle);
 
     const rightOutH = 2200;
     const rightRender = await renderToSensorAR(rightURL, sensorAR, rightOutH, 1, 0);
     await placeContain(pdf, rightRender.dataURL, imgBox);
 
     bars.bottom({
-      text: (lensDescriptions?.[R_label]?.text || ""),
-      link: (lensDescriptions?.[R_label]?.url  || ""),
+      text: R_pdfText,
+      link: R_pdfLink,
       logo: logoImg
     });
 
     // Save
     const fname =
-      `IronGlass_Compare_${safeFileName(L_label)}_vs_${safeFileName(R_label)}_${safeFileName(uiFocal)}_TL${safeFileName(uiTL)}_TR${safeFileName(uiTR)}.pdf`;
+      (L_isCustom || R_isCustom)
+        ? `IronGlass_Custom_Compare_${safeFileName(L_pdfName)}_vs_${safeFileName(R_pdfName)}.pdf`
+        : `IronGlass_Compare_${safeFileName(L_label)}_vs_${safeFileName(R_label)}_${safeFileName(uiFocal)}_TL${safeFileName(uiTL)}_TR${safeFileName(uiTR)}.pdf`;
 
     pdf.save(fname);
   } catch(err){
